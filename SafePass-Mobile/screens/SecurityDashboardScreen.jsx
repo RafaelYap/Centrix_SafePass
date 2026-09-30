@@ -302,7 +302,7 @@ const buildSecurityProfileForm = (profile = {}) => ({
   profilePhoto: profile.profilePhoto || null,
 });
 
-export default function SecurityDashboardScreen({ navigation }) {
+export default function SecurityDashboardScreen({ navigation, onLogout }) {
   const { width: viewportWidth } = useWindowDimensions();
   const isDesktop = viewportWidth >= 1024;
   const isMobileLayout = viewportWidth < 768;
@@ -607,18 +607,17 @@ export default function SecurityDashboardScreen({ navigation }) {
   };
 
   const performLogout = async () => {
-    setShowLogoutModal(false);
+    if (isLoggingOut) return;
     setIsLoggingOut(true);
-    
     try {
       await ApiService.logout();
-      await ApiService.clearAuth();
-      navigation.replace("RoleSelect");
     } catch (error) {
       console.error("Logout error:", error);
       await ApiService.clearAuth();
-      navigation.replace("RoleSelect");
     } finally {
+      setShowLogoutModal(false);
+      onLogout?.();
+      navigation.reset({ index: 0, routes: [{ name: "RoleSelect" }] });
       setIsLoggingOut(false);
     }
   };
@@ -1814,6 +1813,11 @@ export default function SecurityDashboardScreen({ navigation }) {
       }
       return false;
     }
+  };
+
+  const openSecurityNotifications = () => {
+    setShowNotificationModal(true);
+    void loadNotifications(user, { force: true });
   };
 
   const loadAnalytics = async () => {
@@ -5993,7 +5997,7 @@ export default function SecurityDashboardScreen({ navigation }) {
           </View>
         </View>
         <View style={securityMobileStyles.headerActions}>
-          <TouchableOpacity style={securityMobileStyles.headerButton} onPress={() => setShowNotificationModal(true)}>
+          <TouchableOpacity style={securityMobileStyles.headerButton} onPress={openSecurityNotifications} accessibilityLabel="Open notifications">
             <Ionicons name="notifications-outline" size={19} color={BRAND.blue} />
             {unreadCount > 0 ? <View style={securityMobileStyles.dotBadge} /> : null}
           </TouchableOpacity>
@@ -6930,6 +6934,73 @@ export default function SecurityDashboardScreen({ navigation }) {
         <MobileBottomNav dark={mobileDarkModeEnabled} tabs={securityMobileTabs} activeTab={securityMobileTab} onChange={handleMobileTabChange} />
         {renderMobileVisitorDetailModal()}
         {renderFullscreenMapModal()}
+        <Modal visible={showLogoutModal} transparent animationType="fade" onRequestClose={cancelLogout}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalIconContainer}>
+                <Ionicons name="log-out-outline" size={40} color="#DC2626" />
+              </View>
+              <Text style={styles.modalTitle}>Sign Out</Text>
+              <Text style={styles.modalMessage}>Would you like to sign out?</Text>
+              <View style={styles.modalButtonContainer}>
+                <TouchableOpacity style={styles.modalCancelButton} onPress={cancelLogout} disabled={isLoggingOut}>
+                  <Text style={styles.modalCancelText}>Stay Signed In</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalConfirmButton} onPress={performLogout} disabled={isLoggingOut}>
+                  {isLoggingOut ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.modalConfirmText}>Sign Out</Text>}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+        <Modal visible={showNotificationModal} transparent animationType="slide" onRequestClose={() => setShowNotificationModal(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <View style={styles.notificationHeaderTitle}>
+                  <Ionicons name="notifications-outline" size={24} color="#0A3D91" />
+                  <Text style={styles.modalTitle}>Notifications</Text>
+                </View>
+                <View style={styles.notificationHeaderActions}>
+                  {unreadCount > 0 ? (
+                    <TouchableOpacity onPress={markAllAsRead} style={styles.markAllButton}>
+                      <Text style={styles.markAllText}>Mark all read</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  <TouchableOpacity onPress={() => setShowNotificationModal(false)} accessibilityLabel="Close notifications">
+                    <Ionicons name="close" size={24} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+                {notifications.length ? notifications.map((notification) => (
+                  <TouchableOpacity
+                    key={notification._id}
+                    style={[styles.notificationItem, !notification.read && styles.notificationUnread]}
+                    onPress={() => markAsRead(notification)}
+                  >
+                    <View style={[styles.notificationIcon, { backgroundColor: notification.type === "alert" ? "#FEE2E2" : "#EEF5FF" }]}>
+                      <Ionicons name={notification.type === "alert" ? "warning" : "notifications-outline"} size={20} color={notification.type === "alert" ? "#DC2626" : "#0A3D91"} />
+                    </View>
+                    <View style={styles.notificationContent}>
+                      <View style={styles.notificationHeader}>
+                        <Text style={styles.notificationTitle}>{notification.title}</Text>
+                        {!notification.read ? <View style={styles.unreadDot} /> : null}
+                      </View>
+                      <Text style={styles.notificationMessage}>{notification.message}</Text>
+                      <Text style={styles.notificationTime}>{formatTime(notification.createdAt)}</Text>
+                    </View>
+                  </TouchableOpacity>
+                )) : (
+                  <View style={styles.emptyNotifications}>
+                    <Ionicons name="notifications-off-outline" size={48} color="#E5E7EB" />
+                    <Text style={styles.emptyText}>No notifications</Text>
+                  </View>
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     );
   };
@@ -6992,7 +7063,7 @@ export default function SecurityDashboardScreen({ navigation }) {
               <View style={styles.headerRight}>
                 <TouchableOpacity 
                   style={styles.notificationBell}
-                  onPress={() => setShowNotificationModal(true)}
+                  onPress={openSecurityNotifications}
                 >
                   <Ionicons name="notifications-outline" size={22} color="#0A3D91" />
                   {unreadCount > 0 && (

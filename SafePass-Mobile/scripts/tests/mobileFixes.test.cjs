@@ -23,6 +23,23 @@ function load(file, mocks = {}, globals = {}) {
   return context.exports;
 }
 
+test('Admin access remains on web and is blocked in the Android app', () => {
+  const constants = { expoConfig: { extra: { appVariant: 'full' } } };
+  const android = load('utils/appVariant.js', {
+    'expo-constants': constants,
+    'react-native': { Platform: { OS: 'android' } },
+  });
+  const web = load('utils/appVariant.js', {
+    'expo-constants': constants,
+    'react-native': { Platform: { OS: 'web' } },
+  });
+  assert.equal(android.isRoleAllowedInCurrentVariant('admin'), false);
+  assert.equal(android.isRoleAllowedInCurrentVariant('security'), true);
+  assert.equal(android.getVariantInitialRoute({ currentUser: { role: 'admin' } }), 'RoleSelect');
+  assert.equal(web.isRoleAllowedInCurrentVariant('admin'), true);
+  assert.equal(web.getVariantInitialRoute({ currentUser: { role: 'admin' } }), 'AdminDashboard');
+});
+
 test('Attendance screen renders its Modal after loading', () => {
   const types = [];
   const react = {

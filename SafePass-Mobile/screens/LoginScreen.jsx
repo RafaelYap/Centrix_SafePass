@@ -1290,7 +1290,9 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
           label: "Campus Access",
           title: "Sign In to Sapphire",
           subtitle:
-            "Use your student, staff, visitor, security, or admin account to open the correct dashboard.",
+            Platform.OS === "web"
+              ? "Use your student, staff, visitor, security, or admin account to open the correct dashboard."
+              : "Use your student, staff, visitor, or security account to open the correct dashboard.",
           icon: "id-card-outline",
           accent: brandColors.blue,
           panel: "Smart Campus Platform",
@@ -1789,7 +1791,9 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
                     Campus Login
                   </Text>
                   <Text style={loginStyles.headerTagline}>
-                    Secure access for students, staff, visitors, security, and admins.
+                    {Platform.OS === "web"
+                      ? "Secure access for students, staff, visitors, security, and admins."
+                      : "Secure access for students, staff, visitors, and security."}
                   </Text>
                   <View style={loginStyles.flightAccent}>
                     <View style={loginStyles.flightAccentLine} />
@@ -1858,7 +1862,9 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
                       <View style={loginStyles.loginVisualIntro}>
                         <Text style={loginStyles.loginVisualHeading}>Campus Login</Text>
                         <Text style={loginStyles.loginVisualSubtitle}>
-                          Secure access for students, staff, visitors, security, and admins.
+                          {Platform.OS === "web"
+                            ? "Secure access for students, staff, visitors, security, and admins."
+                            : "Secure access for students, staff, visitors, and security."}
                         </Text>
                         <Animated.View style={[
                           loginStyles.loginVisualStatusBadge,

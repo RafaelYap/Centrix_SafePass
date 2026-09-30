@@ -810,7 +810,7 @@ export default function App() {
         />
 
         {/* Dashboard Screens */}
-        {!IS_VISITOR_ONLY_APP && (
+        {!IS_VISITOR_ONLY_APP && Platform.OS === "web" && (
           <Stack.Screen name="AdminDashboard">
             {(props) => (
               <ProtectedScreen currentUser={currentUser} allowedRoles={["admin"]} navigation={props.navigation}>

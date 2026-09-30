@@ -51,6 +51,9 @@ const platformHighlights = [
     icon: "settings-outline",
   },
 ];
+const visiblePlatformHighlights = isWeb
+  ? platformHighlights
+  : platformHighlights.filter((item) => item.title !== "Admins");
 
 const metrics = [
   ["Campus ID", "Virtual NFC"],
@@ -803,7 +806,7 @@ export default function RoleSelectScreen({ navigation, route }) {
             <Text style={roleSelectStyles.mobileSectionKicker}>Platform Coverage</Text>
             <Text style={roleSelectStyles.mobileSectionTitle}>Built for every campus role</Text>
             <View style={roleSelectStyles.mobileFeatureList}>
-              {platformHighlights.map((item) => (
+              {visiblePlatformHighlights.map((item) => (
                 <View key={item.title} style={roleSelectStyles.mobileFeatureItem}>
                   <View style={roleSelectStyles.mobileFeatureIcon}>
                     <Ionicons name={item.icon} size={20} color={brandColors.blue} />
@@ -1067,7 +1070,7 @@ export default function RoleSelectScreen({ navigation, route }) {
           </Text>
 
           <View style={roleSelectStyles.featureGrid}>
-            {platformHighlights.map((item, index) => {
+            {visiblePlatformHighlights.map((item, index) => {
               const cardScrollTranslate = scrollY.interpolate({
                 inputRange: [210 + index * 26, 430 + index * 26],
                 outputRange: [46, 0],

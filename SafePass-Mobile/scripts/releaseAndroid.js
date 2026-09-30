@@ -45,11 +45,13 @@ if (prepareOnly) process.exit(0);
 
 let buildRoot = root;
 let temporaryDrive = "";
-if (isWindows && root.length > 60) {
+// CMake adds long generated object paths; map even moderately deep workspaces.
+if (isWindows && root.length > 40) {
   temporaryDrive = "S:";
-  const mapped = spawnSync("subst", [temporaryDrive, root], { stdio: "inherit", shell: true });
+  // Expo autolinking must find package.json above android, not at the drive root.
+  const mapped = spawnSync("subst", [temporaryDrive, path.dirname(root)], { stdio: "inherit", shell: true });
   if (mapped.status !== 0) process.exit(mapped.status || 1);
-  buildRoot = `${temporaryDrive}\\`;
+  buildRoot = path.join(`${temporaryDrive}\\`, path.basename(root));
 }
 
 try {
@@ -57,8 +59,8 @@ try {
   const build = temporaryDrive
     ? spawnSync(
         "cmd.exe",
-        ["/d", "/c", `${temporaryDrive} && cd \\android && gradlew.bat ${buildArgs.join(" ")}`],
-        { cwd: "C:\\", stdio: "inherit", env: { ...process.env, NODE_ENV: "production" } },
+        ["/d", "/c", `gradlew.bat ${buildArgs.join(" ")}`],
+        { cwd: path.join(buildRoot, "android"), stdio: "inherit", env: { ...process.env, NODE_ENV: "production" } },
       )
     : spawnSync(isWindows ? "gradlew.bat" : "./gradlew", buildArgs, {
         cwd: path.join(buildRoot, "android"), stdio: "inherit", shell: isWindows,

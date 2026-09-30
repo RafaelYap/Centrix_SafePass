@@ -28,13 +28,6 @@ import {
   normalizePhilippineMobileNumber,
 } from "../utils/phoneValidation";
 import { useAviationTransition } from "../utils/AviationTransitionContext";
-import { makeRedirectUri } from "expo-auth-session";
-import useGoogleSignIn from "../utils/useGoogleSignIn";
-
-const GOOGLE_SIGN_IN_ENABLED = false;
-
-const VISITOR_SOCIAL_SIGNUP_REDIRECT_URI =
-  Platform.OS === "web" ? makeRedirectUri() : undefined;
 
 // ================= SUCCESS MODAL COMPONENT =================
 const SuccessModal = ({
@@ -555,10 +548,6 @@ export default function VisitorRegisterScreen({ navigation, route }) {
   const [registrationOtpResendSecondsLeft, setRegistrationOtpResendSecondsLeft] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [socialSignup, setSocialSignup] = useState(null);
-  const [socialSignupBusy, setSocialSignupBusy] = useState("");
-  const [socialSignupNotice, setSocialSignupNotice] = useState(null);
-  const { googleClientId, googleRequest, promptGoogleSignIn: promptGoogleSignUp } = useGoogleSignIn({ redirectUri: VISITOR_SOCIAL_SIGNUP_REDIRECT_URI });
   const screenFadeAnim = useRef(new Animated.Value(0.96)).current;
   const headerAnim = useRef(new Animated.Value(0)).current;
   const formAnim = useRef(new Animated.Value(0)).current;
@@ -952,10 +941,8 @@ export default function VisitorRegisterScreen({ navigation, route }) {
       email: validateEmail(formData.email),
       username: validateUsername(formData.username),
       phone: validatePhone(formData.phone),
-      password: socialSignup ? "" : validatePassword(formData.password),
-      confirmPassword: socialSignup
-        ? ""
-        : validateConfirmPassword(formData.confirmPassword, formData.password),
+      password: validatePassword(formData.password),
+      confirmPassword: validateConfirmPassword(formData.confirmPassword, formData.password),
     };
 
     setErrors(nextErrors);
@@ -989,62 +976,6 @@ export default function VisitorRegisterScreen({ navigation, route }) {
     return true;
   };
 
-  const applySocialSignupProfile = (provider, response) => {
-    const profile = response?.profile;
-    if (!response?.signupToken || !profile?.email || !profile?.fullName) {
-      throw new Error("The social provider did not return a usable account profile.");
-    }
-    if (response.accountExists) {
-      setSocialSignup(null);
-      setExistingAccountEmail(String(profile.email).trim().toLowerCase());
-      setSocialSignupNotice({
-        type: "existing",
-        email: String(profile.email).trim().toLowerCase(),
-        message: "A SafePass account already exists for this verified email. Sign in instead, then connect this provider from your profile if needed.",
-      });
-      return;
-    }
-    const suggestedUsername = String(profile.email).split("@")[0]
-      .replace(/[^A-Za-z0-9._]/g, "")
-      .slice(0, 24)
-      .toLowerCase();
-    const nextFormData = {
-      ...formData,
-      fullName: normalizeFullName(profile.fullName),
-      email: String(profile.email).trim().toLowerCase(),
-      username: formData.username || suggestedUsername,
-      password: "",
-      confirmPassword: "",
-    };
-    setFormData(nextFormData);
-    setSocialSignup({ provider, signupToken: response.signupToken });
-    setSocialSignupNotice({
-      type: "connected",
-      message: "Google is connected. Your account has not been created yet—add a username and contact number, then continue to create your account and verify it before signing in.",
-    });
-    setErrors((previous) => ({ ...previous, fullName: "", email: "", password: "", confirmPassword: "" }));
-    setCompletedFields((previous) => ({ ...previous, fullName: true, email: true }));
-  };
-
-  const handleGoogleSignup = async () => {
-    if (!googleClientId || !googleRequest) {
-      Alert.alert("Sign-up not ready", "Google sign-up is still loading. Please try again.");
-      return;
-    }
-    try {
-      setSocialSignupBusy("google");
-      const result = await promptGoogleSignUp();
-      if (result.type !== "success") return;
-      const token = result.params?.id_token || result.authentication?.idToken;
-      if (!token) throw new Error("Google did not return an account token.");
-      applySocialSignupProfile("google", await ApiService.getSocialSignupProfile("google", token));
-    } catch (error) {
-      Alert.alert("Unable to connect account", error?.message || "Please try again or use the standard visitor form.");
-    } finally {
-      setSocialSignupBusy("");
-    }
-  };
-
   const handleSubmit = () => {
     if (validateForm()) {
       setPrivacySubmissionError("");
@@ -1063,7 +994,6 @@ export default function VisitorRegisterScreen({ navigation, route }) {
         username: normalizeUsername(formData.username),
         phone: normalizePhilippineMobileNumber(formData.phone),
         password: formData.password,
-        socialSignupToken: socialSignup?.signupToken || "",
         privacyAccepted: true,
         privacyAcceptedAt: new Date().toISOString(),
       });
@@ -1075,7 +1005,6 @@ export default function VisitorRegisterScreen({ navigation, route }) {
           email: response.credentials?.email || formData.email,
           isVerified: false,
           otpDeliveryMode: response.otpDeliveryMode || "email",
-          socialProvider: socialSignup?.provider || "",
         });
         setRegistrationOtpResendAvailableAt(new Date(Date.now() + 60 * 1000).toISOString());
         setRegistrationOtp("");
@@ -1165,7 +1094,7 @@ export default function VisitorRegisterScreen({ navigation, route }) {
       registeredVisitor?.email ||
       registeredVisitor?.username ||
       formData.email;
-    const loginPassword = registeredVisitor?.socialProvider ? "" : registeredVisitor?.password || formData.password;
+    const loginPassword = registeredVisitor?.password || formData.password;
 
     setShowSuccess(false);
 
@@ -1265,9 +1194,7 @@ export default function VisitorRegisterScreen({ navigation, route }) {
     { key: "password", label: "Password", icon: "lock-closed-outline" },
     { key: "confirmPassword", label: "Confirm", icon: "shield-checkmark-outline" },
   ];
-  const registrationFields = socialSignup
-    ? baseRegistrationFields.filter((field) => field.key !== "password" && field.key !== "confirmPassword")
-    : baseRegistrationFields;
+  const registrationFields = baseRegistrationFields;
   const fieldCompletion = {
     fullName: Boolean(formData.fullName && !validateName(formData.fullName)),
     email: Boolean(formData.email && !validateEmail(formData.email)),
@@ -1657,63 +1584,6 @@ export default function VisitorRegisterScreen({ navigation, route }) {
 
               {isDesktopRegister || isSimpleRegister ? null : renderStepInsights()}
 
-              {GOOGLE_SIGN_IN_ENABLED ? <View style={{ marginTop: 12, marginBottom: 2, padding: isCompactRegister ? 10 : 11, borderWidth: 1, borderColor: "#D8E6F8", borderRadius: 10, backgroundColor: "#F8FBFF" }}>
-                <Text style={{ textAlign: "center", color: "#334155", fontSize: 11, fontWeight: "800", marginBottom: 3 }}>
-                  FASTER VISITOR SIGN-UP
-                </Text>
-                <Text style={{ textAlign: "center", color: "#64748B", fontSize: 11, lineHeight: 15, marginBottom: 8 }}>
-                  Connect Google to fill your verified name and email. You will still add a username and contact number.
-                </Text>
-                <View style={{ flexDirection: isCompactRegister ? "column" : "row", gap: 9 }}>
-                  <TouchableOpacity
-                    style={{ flex: 1, minHeight: 38, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 7, backgroundColor: "#FFFFFF", opacity: socialSignupBusy && socialSignupBusy !== "google" ? 0.55 : 1 }}
-                    onPress={handleGoogleSignup}
-                    disabled={Boolean(socialSignupBusy) || isSubmitting}
-                  >
-                    {socialSignupBusy === "google" ? <ActivityIndicator size="small" color="#DB4437" /> : <Ionicons name="logo-google" size={16} color="#DB4437" />}
-                    <Text style={{ color: "#1E293B", fontSize: 12, fontWeight: "800" }}>Google</Text>
-                  </TouchableOpacity>
-                </View>
-                {socialSignup ? (
-                  <Text style={{ textAlign: "center", color: "#15803D", fontSize: 11, fontWeight: "700", marginTop: 7 }}>
-                    Google will be connected to this visitor account.
-                  </Text>
-                ) : null}
-                {socialSignupNotice ? (
-                  <View
-                    style={{
-                      marginTop: 9,
-                      padding: 10,
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: socialSignupNotice.type === "existing" ? "#FCD34D" : "#86EFAC",
-                      backgroundColor: socialSignupNotice.type === "existing" ? "#FFFBEB" : "#F0FDF4",
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: socialSignupNotice.type === "existing" ? "#92400E" : "#166534",
-                        fontSize: 11,
-                        lineHeight: 16,
-                        fontWeight: "700",
-                        textAlign: "center",
-                      }}
-                    >
-                      {socialSignupNotice.message}
-                    </Text>
-                    {socialSignupNotice.type === "existing" ? (
-                      <TouchableOpacity
-                        style={{ marginTop: 8, alignSelf: "center", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 7, backgroundColor: "#0A3D91" }}
-                        onPress={() => goToVisitorLogin({ initialEmail: socialSignupNotice.email })}
-                        disabled={transitionBusy}
-                      >
-                        <Text style={{ color: "#FFFFFF", fontSize: 11, fontWeight: "900" }}>Go to Sign In</Text>
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
-                ) : null}
-              </View> : null}
-
               <View style={visitorRegisterStyles.formNoticeCard}>
                 <View style={visitorRegisterStyles.formNoticeIcon}>
                   <Ionicons name="information-circle-outline" size={18} color="#0A3D91" />
@@ -1724,7 +1594,7 @@ export default function VisitorRegisterScreen({ navigation, route }) {
               </View>
 
               <View style={[visitorRegisterStyles.formGrid, formGridResponsiveStyle]}>
-                {Object.entries(fieldConfig).filter(([field]) => !socialSignup || (field !== "password" && field !== "confirmPassword")).map(([field, config]) => {
+                {Object.entries(fieldConfig).map(([field, config]) => {
                   const isPasswordField = field === "password" || field === "confirmPassword";
                   const passwordIsVisible =
                     field === "password" ? showPassword : showConfirmPassword;

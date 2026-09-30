@@ -2,7 +2,7 @@
   "expo": {
     "name": "CentrixMobile",
     "slug": "safepass-mobile",
-    "version": "1.03",
+    "version": "1.04",
     "orientation": "portrait",
     "icon": "./assets/LogoSapphireAppIcon.png",
     "userInterfaceStyle": "light",
@@ -23,7 +23,7 @@
       }
     },
     "android": {
-      "versionCode": 103,
+      "versionCode": 104,
       "adaptiveIcon": {
         "foregroundImage": "./assets/LogoSapphireAppIcon.png",
         "backgroundColor": "#052044"

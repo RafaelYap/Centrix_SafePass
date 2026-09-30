@@ -54,7 +54,7 @@ export const isRoleAllowedInCurrentVariant = (role) => {
     return normalizeAppRole(role) === "visitor";
   }
 
-  return true;
+  return Platform.OS === "web" || normalizeAppRole(role) !== "admin";
 };
 
 export const getVariantInitialRoute = ({ currentUser, isNewRegistration }) => {
@@ -67,6 +67,7 @@ export const getVariantInitialRoute = ({ currentUser, isNewRegistration }) => {
 
   if (currentUser) {
     const role = normalizeAppRole(currentUser.role);
+    if (!isRoleAllowedInCurrentVariant(role)) return "RoleSelect";
     if (role === "admin") return "AdminDashboard";
     if (role === "staff") return "StaffDashboard";
     if (role === "security" || role === "guard") return "SecurityDashboard";
@@ -81,6 +82,10 @@ export const getVariantInitialRoute = ({ currentUser, isNewRegistration }) => {
 export const getVariantBlockedRoleMessage = (role) => {
   if (IS_VISITOR_ONLY_APP) {
     return "This portal is for visitor accounts only. Please use the main SafePass portal for staff, security, or admin access.";
+  }
+
+  if (Platform.OS !== "web" && normalizeAppRole(role) === "admin") {
+    return "Admin accounts are available on the SafePass website. Please sign in there.";
   }
 
   return "";

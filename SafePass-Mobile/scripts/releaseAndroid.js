@@ -35,7 +35,7 @@ if (buildNumber <= currentBuild) {
 }
 
 const tag = `v${version}`;
-const downloadUrl = `https://github.com/pogiko1345/Centrix_SafePass/releases/download/${tag}/CentrixMobile.apk`;
+const downloadUrl = `https://github.com/RafaelYap/Centrix_SafePass/releases/download/${tag}/CentrixMobile.apk`;
 appConfig.expo.version = version;
 appConfig.expo.android.versionCode = buildNumber;
 fs.writeFileSync(appConfigPath, `${JSON.stringify(appConfig, null, 2)}\n`);

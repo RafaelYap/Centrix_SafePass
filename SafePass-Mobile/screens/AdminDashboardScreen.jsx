@@ -1,3 +1,4 @@
+import { fetchAttendanceRecords } from "../utils/paginatedRecords";
 import Alert from '../utils/Alert';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
@@ -3177,11 +3178,11 @@ export default function AdminDashboardScreen({ navigation, onLogout }) {
     try {
       const dateRange = getAttendanceDateRange(attendanceDateShortcut);
       const [attendanceResponse, summaryResponse] = await Promise.all([
-        ApiService.getAttendance({ ...dateRange, limit: 250 }),
+        fetchAttendanceRecords(page => ApiService.getAttendance({ ...dateRange, page, limit: 500 })),
         ApiService.getAttendanceSummary(dateRange),
       ]);
 
-      setAttendanceRecords(Array.isArray(attendanceResponse?.attendance) ? attendanceResponse.attendance : []);
+      setAttendanceRecords(attendanceResponse);
       setAttendanceSummary(summaryResponse?.summary || null);
     } catch (error) {
       if (!isSafePassConnectionError(error)) {

@@ -49,10 +49,16 @@ export default function VisitorPassScreen({ navigation, route }) {
       }),
     ]).start();
 
-    if (visitorId && !initialData) {
+    if (initialData) {
+      setVisitor(initialData);
+      setIsLoading(false);
+    } else if (visitorId) {
       loadVisitorData();
+    } else {
+      setError("No visitor pass selected.");
+      setIsLoading(false);
     }
-  }, [visitorId]);
+  }, [visitorId, initialData]);
 
   const loadVisitorData = async () => {
     setIsLoading(true);
@@ -95,25 +101,11 @@ export default function VisitorPassScreen({ navigation, route }) {
   };
 
   const handleAddToWallet = () => {
-    Alert.alert(
-      "Add to Wallet",
-      "Add your visitor pass to Apple Wallet / Google Pay",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Add", onPress: () => Alert.alert("✅ Success", "Pass added to wallet") }
-      ]
-    );
+    Alert.alert("Wallet unavailable", "Wallet integration is not available yet. Use Share Pass to share your pass details.");
   };
 
   const handleEmailPass = () => {
-    Alert.alert(
-      "Email Pass",
-      "Send your visitor pass to your email",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Send", onPress: () => Alert.alert("✅ Success", "Pass sent to your email") }
-      ]
-    );
+    Alert.alert("Email unavailable", "Email delivery is not available here. Use Share Pass and choose your email app.");
   };
 
   const formatDate = (dateString) => {
@@ -329,9 +321,9 @@ export default function VisitorPassScreen({ navigation, route }) {
               onPress={() => setShowQRModal(true)}
             >
               <View style={visitorPassStyles.qrPlaceholder}>
-                <Ionicons name="qr-code" size={60} color="#FFFFFF" />
+                <Ionicons name="id-card-outline" size={60} color="#FFFFFF" />
               </View>
-              <Text style={visitorPassStyles.qrText}>Tap to view QR code</Text>
+              <Text style={visitorPassStyles.qrText}>Tap to view pass details</Text>
             </TouchableOpacity>
 
             {/* Card Footer */}
@@ -370,9 +362,9 @@ export default function VisitorPassScreen({ navigation, route }) {
 
           <TouchableOpacity style={visitorPassStyles.quickAction} onPress={() => setShowQRModal(true)}>
             <View style={[visitorPassStyles.quickActionIcon, { backgroundColor: '#E6F0FF' }]}>
-              <Ionicons name="qr-code-outline" size={20} color="#0A3D91" />
+              <Ionicons name="id-card-outline" size={20} color="#0A3D91" />
             </View>
-            <Text style={visitorPassStyles.quickActionText}>Show QR</Text>
+            <Text style={visitorPassStyles.quickActionText}>Pass Details</Text>
           </TouchableOpacity>
         </View>
 
@@ -490,7 +482,7 @@ export default function VisitorPassScreen({ navigation, route }) {
         <View style={visitorPassStyles.notesCard}>
           <Ionicons name="information-circle-outline" size={20} color="#6B7280" />
           <Text style={visitorPassStyles.notesText}>
-            Please present this QR code at the security gate for entry. 
+            Contact campus security for entry verification. This screen does not generate a scannable QR code.
             Visitor pass is valid for the scheduled date and time only.
           </Text>
         </View>
@@ -524,7 +516,7 @@ export default function VisitorPassScreen({ navigation, route }) {
         <View style={visitorPassStyles.modalOverlay}>
           <View style={visitorPassStyles.modalContent}>
             <View style={visitorPassStyles.modalHeader}>
-              <Text style={visitorPassStyles.modalTitle}>Your QR Code</Text>
+              <Text style={visitorPassStyles.modalTitle}>Pass Details</Text>
               <TouchableOpacity onPress={() => setShowQRModal(false)}>
                 <Ionicons name="close" size={24} color="#6B7280" />
               </TouchableOpacity>
@@ -532,7 +524,8 @@ export default function VisitorPassScreen({ navigation, route }) {
 
             <View style={visitorPassStyles.modalBody}>
               <View style={visitorPassStyles.largeQRPlaceholder}>
-                <Ionicons name="qr-code" size={200} color="#0A3D91" />
+                <Ionicons name="id-card-outline" size={80} color="#0A3D91" />
+                <Text>QR access is unavailable.</Text>
               </View>
               
               <Text style={visitorPassStyles.qrVisitorName}>{visitor.fullName}</Text>
@@ -553,13 +546,7 @@ export default function VisitorPassScreen({ navigation, route }) {
                 </View>
               </View>
 
-              <TouchableOpacity
-                style={visitorPassStyles.downloadQRButton}
-                onPress={() => Alert.alert("✅ Success", "QR code saved to gallery")}
-              >
-                <Ionicons name="download-outline" size={20} color="#FFFFFF" />
-                <Text style={visitorPassStyles.downloadQRText}>Download QR</Text>
-              </TouchableOpacity>
+
             </View>
           </View>
         </View>

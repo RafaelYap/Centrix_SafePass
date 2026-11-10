@@ -585,14 +585,13 @@ export default function StaffDashboardScreen({ navigation, onLogout }) {
         setLoading(false);
       }
 
-      const profilePromise = ApiService.getProfile();
-      const appointmentPromise = ApiService.getStaffAppointments({ status: "all", limit: 200 });
-
-      const appointmentResponse = await appointmentPromise;
+      const [profile, appointmentResponse] = await Promise.all([
+        ApiService.getProfile(),
+        ApiService.getStaffAppointments({ status: "all", limit: 200 }),
+      ]);
       setAppointments(appointmentResponse?.appointments || []);
       setLoading(false);
 
-      const profile = await profilePromise;
       const currentUser = profile?.user || cachedUser;
       const currentRole = String(currentUser?.role || "").toLowerCase();
       if (!currentUser || currentRole !== "staff") {

@@ -1,3 +1,4 @@
+import { fetchPaginatedRecords } from "../utils/paginatedRecords";
 import Alert from '../utils/Alert';
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -56,6 +57,7 @@ export default function ReportsScreen({ navigation }) {
   const [authLoading, setAuthLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
 
+  const [loadError, setLoadError] = useState("");
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -66,6 +68,7 @@ export default function ReportsScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState("");
 
   const verifyUserAndLoadData = useCallback(async () => {
+    setLoadError("");
     try {
       const user = await ApiService.getCurrentUser();
       if (!user) {
@@ -85,15 +88,14 @@ export default function ReportsScreen({ navigation }) {
         return;
       }
 
-      const response = await ApiService.getAccessLogs(1, 200);
-      const items =
-        response?.accessLogs ||
-        response?.logs ||
-        response?.data ||
-        (Array.isArray(response) ? response : []);
-      setLogs(Array.isArray(items) ? items : []);
+      const records = await fetchPaginatedRecords(
+        page => ApiService.getAccessLogs(page, 500, { all: true }), "accessLogs",
+      );
+      setLogs(records);
     } catch (error) {
-      console.error("Reports load error:", error);
+      setLogs([]);
+      setLoadError(error?.message || "Unable to load report records.");
+      setAuthLoading(false);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -114,9 +116,10 @@ export default function ReportsScreen({ navigation }) {
     return logs.filter((log) => {
       // 1. Role Filter
       if (roleFilter !== "all") {
-        const logRole = String(log.role || log.userType || log.user?.role || "visitor").toLowerCase();
+        const logRole = String(log.actorRole || log.metadata?.userType || log.role || log.userType || log.user?.role || "visitor").toLowerCase();
         if (roleFilter === "staff" && !["staff", "teacher"].includes(logRole)) return false;
-        if (roleFilter !== "staff" && logRole !== roleFilter) return false;
+        if (roleFilter === "security" && !["security", "guard"].includes(logRole)) return false;
+        if (!["staff", "security"].includes(roleFilter) && logRole !== roleFilter) return false;
       }
 
       // 2. Date Filter
@@ -124,6 +127,7 @@ export default function ReportsScreen({ navigation }) {
         const timestamp = log.timestamp || log.createdAt || log.time;
         if (!timestamp) return false;
         const logDate = new Date(timestamp);
+        if (Number.isNaN(logDate.getTime())) return false;
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
@@ -135,12 +139,11 @@ export default function ReportsScreen({ navigation }) {
           if (logDate < startOfYesterday || logDate >= startOfToday) return false;
         } else if (dateFilter === "week") {
           const sevenDaysAgo = new Date(startOfToday);
-          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
           if (logDate < sevenDaysAgo) return false;
         } else if (dateFilter === "month") {
-          const thirtyDaysAgo = new Date(startOfToday);
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-          if (logDate < thirtyDaysAgo) return false;
+          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+          if (logDate < monthStart) return false;
         }
       }
 
@@ -171,7 +174,7 @@ export default function ReportsScreen({ navigation }) {
     let deniedCount = 0;
 
     filteredLogs.forEach((log) => {
-      const role = String(log.role || log.userType || log.user?.role || "visitor").toLowerCase();
+      const role = String(log.actorRole || log.metadata?.userType || log.role || log.userType || log.user?.role || "visitor").toLowerCase();
       const status = String(log.status || log.accessType || "").toLowerCase();
 
       if (status.includes("denied") || status.includes("alert")) {
@@ -183,7 +186,7 @@ export default function ReportsScreen({ navigation }) {
       } else if (role === "staff" || role === "teacher") {
         staffCount++;
       } else {
-        if (!status.includes("denied")) {
+        if (role === "visitor" && !status.includes("denied")) {
           approvedVisitors++;
         }
       }
@@ -239,7 +242,7 @@ export default function ReportsScreen({ navigation }) {
       const printableRecords = filteredLogs.map((log) => ({
         time: formatDateTime(log.timestamp || log.createdAt || log.time),
         name: log.fullName || log.userName || log.name || log.user?.fullName || "N/A",
-        role: log.role || log.userType || log.user?.role || "Visitor",
+        role: log.actorRole || log.metadata?.userType || log.role || log.userType || log.user?.role || "Visitor",
         purpose: log.purpose || log.department || log.office || "Campus Access",
         checkpoint: log.checkpointName || log.location || "Main Gate",
         status: log.status || log.accessType || "Recorded",
@@ -288,7 +291,7 @@ export default function ReportsScreen({ navigation }) {
       const rows = filteredLogs.map((log) => [
         formatDateTime(log.timestamp || log.createdAt || log.time),
         log.fullName || log.userName || log.name || log.user?.fullName || "N/A",
-        log.role || log.userType || log.user?.role || "Visitor",
+        log.actorRole || log.metadata?.userType || log.role || log.userType || log.user?.role || "Visitor",
         log.purpose || log.department || log.office || "Campus Access",
         log.checkpointName || log.location || "Main Gate",
         log.status || log.accessType || "Recorded",
@@ -367,6 +370,7 @@ export default function ReportsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {Boolean(loadError) && <Text accessibilityRole="alert" style={{ color: "#B91C1C", padding: 16 }}>{loadError}</Text>}
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -552,7 +556,7 @@ export default function ReportsScreen({ navigation }) {
           ) : (
             filteredLogs.slice(0, 100).map((log, index) => {
               const name = log.fullName || log.userName || log.name || log.user?.fullName || "System Record";
-              const role = log.role || log.userType || log.user?.role || "Visitor";
+              const role = log.actorRole || log.metadata?.userType || log.role || log.userType || log.user?.role || "Visitor";
               const timeStr = formatDateTime(log.timestamp || log.createdAt || log.time);
               const statusStr = String(log.status || log.accessType || "Recorded").toUpperCase();
               const isGranted =

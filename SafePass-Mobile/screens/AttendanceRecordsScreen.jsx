@@ -1,5 +1,5 @@
 import Alert from '../utils/Alert';
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -18,6 +18,8 @@ import ApiService from "../utils/ApiService";
 import saveCsv from "../utils/saveCsv";
 import { printRecordsTable } from "../utils/printUtils";
 import { ATTENDANCE_COLUMNS, attendanceExportRows, attendanceCsv } from "../utils/attendanceExport";
+
+import { localDateKey, attendanceFilterError, fetchAttendanceRecords } from "../utils/attendanceRecords";
 
 const SCHOOL_LOGO = require("../assets/LogoSapphire.jpg");
 
@@ -74,7 +76,7 @@ const getStatusColor = (status = "") => {
 const groupAttendanceByDate = (records = []) => {
   const groups = records.reduce((map, record) => {
     const key = record?.attendanceDate
-      ? new Date(record.attendanceDate).toISOString().slice(0, 10)
+      ? (Number.isNaN(new Date(record.attendanceDate).getTime()) ? "undated" : localDateKey(new Date(record.attendanceDate)))
       : "undated";
     if (!map.has(key)) {
       map.set(key, []);
@@ -96,14 +98,14 @@ const groupAttendanceByDate = (records = []) => {
 
 const getTodayFilter = () => {
   const now = new Date();
-  const iso = now.toISOString().slice(0, 10);
+  const iso = localDateKey(now);
   return { dateFrom: iso, dateTo: iso };
 };
 
 const getYesterdayFilter = () => {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  const iso = yesterday.toISOString().slice(0, 10);
+  const iso = localDateKey(yesterday);
   return { dateFrom: iso, dateTo: iso };
 };
 
@@ -111,8 +113,8 @@ const getThisMonthFilter = () => {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
   return {
-    dateFrom: start.toISOString().slice(0, 10),
-    dateTo: now.toISOString().slice(0, 10),
+    dateFrom: localDateKey(start),
+    dateTo: localDateKey(now),
   };
 };
 
@@ -121,12 +123,14 @@ const getLastDaysFilter = (days) => {
   const start = new Date();
   start.setDate(end.getDate() - (days - 1));
   return {
-    dateFrom: start.toISOString().slice(0, 10),
-    dateTo: end.toISOString().slice(0, 10),
+    dateFrom: localDateKey(start),
+    dateTo: localDateKey(end),
   };
 };
 
 export default function AttendanceRecordsScreen({ navigation }) {
+  const requestId = useRef(0);
+  const [error, setError] = useState("");
   const [records, setRecords] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -150,39 +154,63 @@ export default function AttendanceRecordsScreen({ navigation }) {
     return query;
   }, [filters]);
 
-  const loadData = useCallback(async () => {
-    const query = buildQuery();
-    const [attendanceResponse, summaryResponse] = await Promise.all([
-      ApiService.getAttendance({ ...query, limit: 120 }),
-      ApiService.getAttendanceSummary(query),
-    ]);
+  const validationError = attendanceFilterError(filters);
 
-    setRecords(Array.isArray(attendanceResponse?.attendance) ? attendanceResponse.attendance : []);
-    setSummary(summaryResponse?.summary || null);
+  const loadData = useCallback(async () => {
+    const id = ++requestId.current;
+    const isCurrent = () => id === requestId.current;
+    const query = buildQuery();
+    const invalid = attendanceFilterError(query);
+    setError("");
+    setRecords([]);
+    setSummary(null);
+    if (invalid) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+    setRefreshing(true);
+    try {
+      const [nextRecords, summaryResponse] = await Promise.all([
+        fetchAttendanceRecords(
+          (page) => ApiService.getAttendance({ ...query, page, limit: 500 }),
+          isCurrent,
+        ),
+        ApiService.getAttendanceSummary(query),
+      ]);
+      if (!isCurrent() || !nextRecords) return;
+      if (!summaryResponse?.summary) throw new Error("Unable to load attendance summary.");
+      setRecords(nextRecords);
+      setSummary(summaryResponse.summary);
+    } catch (failure) {
+      if (isCurrent()) setError(failure?.message || "Unable to load attendance. Please retry.");
+    } finally {
+      if (isCurrent()) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
   }, [buildQuery]);
 
   useEffect(() => {
-    const run = async () => {
-      try {
-        await loadData();
-      } finally {
-        setLoading(false);
-      }
+    // Invalidate immediately; debounce edits so partial input does not flood the API.
+    ++requestId.current;
+    setRecords([]);
+    setSummary(null);
+    setError("");
+    setRefreshing(true);
+    const timer = setTimeout(loadData, 300);
+    return () => {
+      clearTimeout(timer);
+      ++requestId.current;
     };
-
-    run();
   }, [loadData]);
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await loadData();
-    } finally {
-      setRefreshing(false);
-    }
-  };
+  const handleRefresh = loadData;
+  const reportUnavailable = refreshing || Boolean(error || validationError);
 
   const exportToCsv = async () => {
+    if (reportUnavailable) return;
     if (!records.length) {
       Alert.alert("No records", "There are no attendance records to export.");
       return;
@@ -195,6 +223,7 @@ export default function AttendanceRecordsScreen({ navigation }) {
   };
 
   const printReport = async () => {
+    if (reportUnavailable) return;
     try {
       await printRecordsTable({
         title: "Attendance & Access Records",
@@ -243,14 +272,23 @@ export default function AttendanceRecordsScreen({ navigation }) {
           </View>
         </View>
 
+        {Boolean(error || validationError) && (
+          <View accessibilityRole="alert" style={styles.section}>
+            <Text style={{ color: "#B91C1C" }}>{validationError || error}</Text>
+            {Boolean(error) && <TouchableOpacity onPress={handleRefresh}><Text>Retry</Text></TouchableOpacity>}
+          </View>
+        )}
+        {refreshing && <Text accessibilityLiveRegion="polite">Updating attendance records...</Text>}
+
         {/* Action Bar: Export CSV & Print */}
         <View style={styles.actionBar}>
-          <TouchableOpacity style={styles.actionBtn} onPress={exportToCsv}>
+          <TouchableOpacity style={styles.actionBtn} disabled={reportUnavailable} onPress={exportToCsv}>
             <Ionicons name="download-outline" size={16} color="#0A3D91" />
             <Text style={styles.actionBtnText}>Export CSV</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionBtn}
+            disabled={reportUnavailable}
             onPress={printReport}
           >
             <Ionicons name="print-outline" size={16} color="#0A3D91" />
@@ -379,9 +417,9 @@ export default function AttendanceRecordsScreen({ navigation }) {
           {groupedRecords.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="calendar-clear-outline" size={34} color="#94A3B8" />
-              <Text style={styles.emptyTitle}>No attendance records found</Text>
+              <Text style={styles.emptyTitle}>{reportUnavailable ? "Attendance unavailable" : "No attendance records found"}</Text>
               <Text style={styles.emptyText}>
-                Try adjusting the date range, status, or user type filters.
+                {reportUnavailable ? "Wait for loading to finish or resolve the error above." : "Try adjusting the date range, status, or user type filters."}
               </Text>
             </View>
           ) : (

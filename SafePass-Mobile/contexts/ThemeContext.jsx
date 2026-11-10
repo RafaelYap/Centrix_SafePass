@@ -65,6 +65,7 @@ export const themes = {
 };
 
 export const ThemeProvider = ({ children }) => {
+  const [hydrated, setHydrated] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [theme, setTheme] = useState(themes.light);
 
@@ -74,8 +75,8 @@ export const ThemeProvider = ({ children }) => {
 
   useEffect(() => {
     setTheme(isDarkMode ? themes.dark : themes.light);
-    saveTheme();
-  }, [isDarkMode]);
+    if (hydrated) saveTheme();
+  }, [isDarkMode, hydrated]);
 
   const loadTheme = async () => {
     try {
@@ -85,6 +86,8 @@ export const ThemeProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('Load theme error:', error);
+    } finally {
+      setHydrated(true);
     }
   };
 
@@ -97,7 +100,7 @@ export const ThemeProvider = ({ children }) => {
   };
 
   const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
+    setIsDarkMode(current => !current);
   };
 
   return (

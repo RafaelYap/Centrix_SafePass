@@ -44,7 +44,7 @@ test('Attendance screen renders its Modal after loading', () => {
   const types = [];
   const react = {
     useState: value => [value === true ? false : value, () => {}],
-    useCallback: fn => fn, useMemo: fn => fn(), useEffect() {},
+    useCallback: fn => fn, useMemo: fn => fn(), useRef: value => ({ current: value }), useEffect() {},
     createElement(type, props, ...children) { assert.ok(type); types.push(type); return { type, props, children }; },
   };
   const rn = Object.fromEntries(['ActivityIndicator','Alert','Modal','Image','RefreshControl','ScrollView','Text','TextInput','TouchableOpacity','View'].map(n => [n, n]));
@@ -54,6 +54,7 @@ test('Attendance screen renders its Modal after loading', () => {
     '@expo/vector-icons': { Ionicons: 'Ionicons' }, '../utils/ApiService': {},
     '../utils/Alert': { alert() {} },
     '../utils/saveCsv': {}, '../utils/printUtils': {}, '../utils/attendanceExport': {},
+    '../utils/attendanceRecords': { attendanceFilterError: () => '' },
   });
   screen.default({ navigation: {} });
   assert.ok(types.includes('Modal'));

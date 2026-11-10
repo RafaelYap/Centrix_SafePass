@@ -1,3 +1,4 @@
+import { fetchPaginatedRecords } from "../utils/paginatedRecords";
 import Alert from '../utils/Alert';
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
@@ -1591,16 +1592,16 @@ export default function SecurityDashboardScreen({ navigation, onLogout }) {
   const loadOperationalData = async ({ force = false } = {}) => {
     try {
       const [allVisitorsRes, accessLogsRes] = await Promise.allSettled([
-        ApiService.getVisitors({ limit: 100 }),
-        ApiService.getAccessLogs(1, 100, { all: true }),
+        fetchPaginatedRecords(page => ApiService.getVisitors({ page, limit: 500 }), "visitors"),
+        fetchPaginatedRecords(page => ApiService.getAccessLogs(page, 500, { all: true }), "accessLogs"),
       ]);
       if (allVisitorsRes.status === "rejected") {
         throw allVisitorsRes.reason;
       }
-      const allVisitors = allVisitorsRes.value?.visitors || [];
+      const allVisitors = allVisitorsRes.value || [];
       const realAccessLogs =
-        accessLogsRes.status === "fulfilled" && Array.isArray(accessLogsRes.value?.accessLogs)
-          ? accessLogsRes.value.accessLogs
+        accessLogsRes.status === "fulfilled" && Array.isArray(accessLogsRes.value)
+          ? accessLogsRes.value
           : [];
       const nextSignature = `${buildOperationalDataSignature(allVisitors)}::${realAccessLogs
         .map((log) => [log?._id, log?.timestamp, log?.activityType, log?.status].join(":"))

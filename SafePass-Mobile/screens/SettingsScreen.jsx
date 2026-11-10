@@ -1,3 +1,4 @@
+import Alert from "../utils/Alert";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -89,6 +90,9 @@ export default function SettingsScreen({ navigation }) {
         await AsyncStorage.setItem("darkModeEnabled", value ? "true" : "false");
       }
       await AsyncStorage.setItem("staffSettings", JSON.stringify(nextSettings));
+    } catch (error) {
+      setSettings(settings);
+      Alert.alert("Settings not saved", error?.message || "Unable to save preferences. Please retry.");
     } finally {
       setSavingKey("");
     }

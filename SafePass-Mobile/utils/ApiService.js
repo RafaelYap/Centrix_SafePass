@@ -2467,9 +2467,8 @@ generateRandomPassword(length = 10) {
         body: data,
       });
     } catch (error) {
-      // Let VisitorManagementScreen fall back to local demo-mode update path.
       console.error("Update visitor error:", error);
-      return { success: false, message: error.message };
+      throw error;
     }
   }
 

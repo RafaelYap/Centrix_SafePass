@@ -1,3 +1,4 @@
+import { fetchPaginatedRecords } from "../utils/paginatedRecords";
 import Alert from '../utils/Alert';
 import React, { useState, useEffect } from "react";
 import {
@@ -121,98 +122,12 @@ export default function VisitorManagementScreen({ navigation, route }) {
   const loadVisitors = async () => {
     setIsLoading(true);
     try {
-      const response = await ApiService.getVisitors({});
-      if (response && response.success) {
-        setVisitors(response.visitors);
-      } else {
-        // Demo data
-        setVisitors([
-          {
-            id: 1,
-            fullName: "John Visitor",
-            email: "john.visitor@example.com",
-            phoneNumber: "09123456789",
-            idNumber: "PASSPORT12345",
-            purposeOfVisit: "Campus Tour",
-            vehicleNumber: "ABC-1234",
-            visitDate: new Date(),
-            visitTime: new Date(),
-            hostName: "Prof. Anderson",
-            hostDepartment: "Aviation Dept",
-            expectedDuration: "2 hours",
-            status: "pending",
-            registeredAt: new Date(),
-          },
-          {
-            id: 2,
-            fullName: "Sarah Guest",
-            email: "sarah.guest@example.com",
-            phoneNumber: "09187654321",
-            idNumber: "DRIVER45678",
-            purposeOfVisit: "Meeting with Dean",
-            vehicleNumber: "",
-            visitDate: new Date(),
-            visitTime: new Date(),
-            hostName: "Dr. Martinez",
-            hostDepartment: "Administration",
-            expectedDuration: "1 hour",
-            status: "approved",
-            registeredAt: new Date(),
-          },
-          {
-            id: 3,
-            fullName: "Mike Contractor",
-            email: "mike.contractor@example.com",
-            phoneNumber: "09123456712",
-            idNumber: "COMPANY78901",
-            purposeOfVisit: "Maintenance",
-            vehicleNumber: "XYZ-5678",
-            visitDate: new Date(),
-            visitTime: new Date(),
-            hostName: "Facilities Dept",
-            hostDepartment: "Maintenance",
-            expectedDuration: "4 hours",
-            status: "checked_in",
-            checkedInAt: new Date(),
-            registeredAt: new Date(),
-          },
-          {
-            id: 4,
-            fullName: "Emily Parent",
-            email: "emily.parent@example.com",
-            phoneNumber: "09123456734",
-            idNumber: "PASSPORT67890",
-            purposeOfVisit: "Parent-Teacher Conference",
-            vehicleNumber: "DEF-9012",
-            visitDate: new Date(),
-            visitTime: new Date(),
-            hostName: "Student Affairs",
-            hostDepartment: "Student Services",
-            expectedDuration: "3 hours",
-            status: "checked_out",
-            checkedInAt: new Date(),
-            checkedOutAt: new Date(),
-            registeredAt: new Date(),
-          },
-          {
-            id: 5,
-            fullName: "David Vendor",
-            email: "david.vendor@example.com",
-            phoneNumber: "09123456756",
-            idNumber: "DRIVER34567",
-            purposeOfVisit: "Supply Delivery",
-            vehicleNumber: "GHI-3456",
-            visitDate: new Date(new Date().setDate(new Date().getDate() - 1)),
-            visitTime: new Date(),
-            hostName: "Procurement",
-            hostDepartment: "Finance",
-            expectedDuration: "30 minutes",
-            status: "expired",
-            registeredAt: new Date(new Date().setDate(new Date().getDate() - 1)),
-          },
-        ]);
-      }
+      const records = await fetchPaginatedRecords(
+        page => ApiService.getVisitors({ page, limit: 500 }), "visitors",
+      );
+      setVisitors(records);
     } catch (error) {
+      setVisitors([]);
       console.error("Error loading visitors:", error);
       Alert.alert("Error", "Failed to load visitors");
     } finally {
@@ -284,15 +199,7 @@ export default function VisitorManagementScreen({ navigation, route }) {
         loadVisitors();
         setShowAddModal(false);
       } else {
-        // Demo mode - add to local state
-        const newVisitor = {
-          id: visitors.length + 1,
-          ...newVisitorData,
-          registeredAt: new Date(),
-        };
-        setVisitors([newVisitor, ...visitors]);
-        Alert.alert("✅ Success", "Visitor added successfully (Demo Mode)");
-        setShowAddModal(false);
+        throw new Error(response?.message || "The server did not save the visitor change.");
       }
     } catch (error) {
       console.error("Add visitor error:", error);
@@ -316,12 +223,7 @@ export default function VisitorManagementScreen({ navigation, route }) {
         loadVisitors();
         setShowEditModal(false);
       } else {
-        // Demo mode - update local state
-        setVisitors(visitors.map(v => 
-          (v._id || v.id) === editVisitorData.id ? { ...v, ...editVisitorData } : v
-        ));
-        Alert.alert("✅ Success", "Visitor updated successfully (Demo Mode)");
-        setShowEditModal(false);
+        throw new Error(response?.message || "The server did not save the visitor change.");
       }
     } catch (error) {
       console.error("Edit visitor error:", error);
@@ -346,9 +248,7 @@ export default function VisitorManagementScreen({ navigation, route }) {
         Alert.alert("✅ Success", "Visitor deleted successfully");
         loadVisitors();
       } else {
-        // Demo mode - remove from local state
-        setVisitors(visitors.filter(v => (v._id || v.id) !== (selectedVisitor._id || selectedVisitor.id)));
-        Alert.alert("✅ Success", "Visitor deleted successfully (Demo Mode)");
+        throw new Error(response?.message || "The server did not save the visitor change.");
       }
     } catch (error) {
       console.error("Delete visitor error:", error);
@@ -371,13 +271,12 @@ export default function VisitorManagementScreen({ navigation, route }) {
           onPress: async () => {
             setIsLoading(true);
             try {
-              // In a real app, call API
-              setVisitors(visitors.map(v => 
-                (v._id || v.id) === (visitor._id || visitor.id) ? { ...v, status: 'approved' } : v
-              ));
+              const response = await ApiService.approveVisitor(visitor._id || visitor.id);
+              if (!response?.success) throw new Error(response?.message || "The server did not complete the action.");
+              await loadVisitors();
               Alert.alert("✅ Success", "Visitor approved successfully");
             } catch (error) {
-              Alert.alert("Error", "Failed to approve visitor");
+              Alert.alert("Error", error?.message || "Failed to approve visitor");
             } finally {
               setIsLoading(false);
             }
@@ -398,17 +297,12 @@ export default function VisitorManagementScreen({ navigation, route }) {
           onPress: async () => {
             setIsLoading(true);
             try {
-              // In a real app, call API
-              setVisitors(visitors.map(v => 
-                (v._id || v.id) === (visitor._id || visitor.id) ? { 
-                  ...v, 
-                  status: 'checked_in',
-                  checkedInAt: new Date()
-                } : v
-              ));
+              const response = await ApiService.securityCheckIn(visitor._id || visitor.id);
+              if (!response?.success) throw new Error(response?.message || "The server did not complete the action.");
+              await loadVisitors();
               Alert.alert("✅ Success", "Visitor checked in successfully");
             } catch (error) {
-              Alert.alert("Error", "Failed to check in visitor");
+              Alert.alert("Error", error?.message || "Failed to check in visitor");
             } finally {
               setIsLoading(false);
             }
@@ -429,17 +323,12 @@ export default function VisitorManagementScreen({ navigation, route }) {
           onPress: async () => {
             setIsLoading(true);
             try {
-              // In a real app, call API
-              setVisitors(visitors.map(v => 
-                (v._id || v.id) === (visitor._id || visitor.id) ? { 
-                  ...v, 
-                  status: 'checked_out',
-                  checkedOutAt: new Date()
-                } : v
-              ));
+              const response = await ApiService.securityCheckOut(visitor._id || visitor.id);
+              if (!response?.success) throw new Error(response?.message || "The server did not complete the action.");
+              await loadVisitors();
               Alert.alert("✅ Success", "Visitor checked out successfully");
             } catch (error) {
-              Alert.alert("Error", "Failed to check out visitor");
+              Alert.alert("Error", error?.message || "Failed to check out visitor");
             } finally {
               setIsLoading(false);
             }

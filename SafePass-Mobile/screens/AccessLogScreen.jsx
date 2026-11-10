@@ -1,3 +1,6 @@
+import Alert from "../utils/Alert";
+import { exportRecordsToCSV } from "../utils/printUtils";
+import { fetchPaginatedRecords } from "../utils/paginatedRecords";
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -20,6 +23,7 @@ import accessLogStyles from "../styles/AccessLogStyles";
 const SCHOOL_LOGO = require("../assets/LogoSapphire.jpg");
 
 export default function AccessLogScreen({ navigation }) {
+  const [loadError, setLoadError] = useState("");
   const [filter, setFilter] = useState("all");
   const [accessLogs, setAccessLogs] = useState([]);
   const [user, setUser] = useState(null);
@@ -27,12 +31,7 @@ export default function AccessLogScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState("all");
   const [selectedLogDetail, setSelectedLogDetail] = useState(null);
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 20,
-    total: 0,
-    pages: 0
-  });
+
 
   useEffect(() => {
     loadUserAndLogs();
@@ -40,6 +39,7 @@ export default function AccessLogScreen({ navigation }) {
 
   const loadUserAndLogs = async () => {
     setIsLoading(true);
+    setLoadError("");
     try {
       const currentUser = await ApiService.getCurrentUser();
       if (!currentUser) {
@@ -49,11 +49,11 @@ export default function AccessLogScreen({ navigation }) {
 
       setUser(currentUser);
       
-      const response = await ApiService.getAccessLogs(pagination.page, pagination.limit);
-      setAccessLogs(response.accessLogs || []);
-      setPagination(response.pagination || pagination);
+      const records = await fetchPaginatedRecords(page => ApiService.getAccessLogs(page, 500), "accessLogs");
+      setAccessLogs(records);
     } catch (error) {
-      console.error("Load data error:", error);
+      setAccessLogs([]);
+      setLoadError(error?.message || "Unable to load access history.");
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -65,28 +65,19 @@ export default function AccessLogScreen({ navigation }) {
     loadUserAndLogs();
   };
 
-  const exportAccessLogsCsv = () => {
+  const exportAccessLogsCsv = async () => {
     if (!filteredLogs.length) return;
-    const headers = ["Timestamp", "Location", "Access Type", "Status", "Reader Device", "Notes"];
-    const rows = filteredLogs.map((l) => [
-      `"${l.timestamp ? new Date(l.timestamp).toISOString() : ""}"`,
-      `"${l.location || ""}"`,
-      `"${l.accessType || ""}"`,
-      `"${l.status || ""}"`,
-      `"${l.readerDevice || l.device || ""}"`,
-      `"${l.notes || ""}"`,
-    ]);
-    const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
-
-    if (typeof window !== "undefined" && window.document) {
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", `SafePass_AccessLogs_${new Date().toISOString().slice(0, 10)}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    try {
+      await exportRecordsToCSV({
+        headers: ["Timestamp", "Location", "Access Type", "Status", "Reader Device", "Notes"],
+        rows: filteredLogs.map(log => [
+          log.timestamp && !Number.isNaN(new Date(log.timestamp).getTime()) ? new Date(log.timestamp).toISOString() : "",
+          log.location || "", log.accessType || "", log.status || "", log.readerDevice || log.device || "", log.notes || "",
+        ]),
+        filename: "SafePass_accessLogs.csv",
+      });
+    } catch (error) {
+      Alert.alert("Export failed", error?.message || "Unable to export logs.");
     }
   };
 
@@ -108,26 +99,27 @@ export default function AccessLogScreen({ navigation }) {
     { id: "all", label: "All Time" },
     { id: "today", label: "Today" },
     { id: "yesterday", label: "Yesterday" },
-    { id: "week", label: "This Week" },
+    { id: "week", label: "Last 7 Days" },
     { id: "month", label: "This Month" },
   ];
 
   const filteredLogs = accessLogs.filter(log => {
     // Status/type filter
-    if (filter !== "all" && log.status !== filter) return false;
+    if (["granted", "denied"].includes(filter) && log.status !== filter) return false;
     if (filter === "entry" && log.accessType !== "entry") return false;
     if (filter === "exit" && log.accessType !== "exit") return false;
     
     // Date filter
     if (selectedDate !== "all") {
       const logDate = new Date(log.timestamp);
+      if (Number.isNaN(logDate.getTime())) return false;
       const today = new Date();
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
       const weekAgo = new Date(today);
-      weekAgo.setDate(weekAgo.getDate() - 7);
-      const monthAgo = new Date(today);
-      monthAgo.setMonth(monthAgo.getMonth() - 1);
+      weekAgo.setHours(0, 0, 0, 0);
+      weekAgo.setDate(weekAgo.getDate() - 6);
+      const monthAgo = new Date(today.getFullYear(), today.getMonth(), 1);
 
       switch (selectedDate) {
         case "today":
@@ -220,6 +212,7 @@ export default function AccessLogScreen({ navigation }) {
     <SafeAreaView style={accessLogStyles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0A3D91" />
       
+      {Boolean(loadError) && <Text accessibilityRole="alert" style={{ color: "#B91C1C", padding: 16 }}>{loadError}</Text>}
       {/* Header */}
       <View style={accessLogStyles.header}>
         <TouchableOpacity 
@@ -553,21 +546,10 @@ export default function AccessLogScreen({ navigation }) {
             {/* Pagination Info */}
             <View style={accessLogStyles.paginationInfo}>
               <Text style={accessLogStyles.paginationText}>
-                Showing {filteredLogs.length} of {pagination.total} records
+                Showing {filteredLogs.length} of {accessLogs.length} records
               </Text>
               
-              {pagination.page < pagination.pages && (
-                <TouchableOpacity 
-                  style={accessLogStyles.loadMoreButton}
-                  onPress={() => {
-                    setPagination({ ...pagination, page: pagination.page + 1 });
-                    loadUserAndLogs();
-                  }}
-                >
-                  <Text style={accessLogStyles.loadMoreText}>Load More</Text>
-                  <Ionicons name="arrow-down" size={16} color="#0A3D91" />
-                </TouchableOpacity>
-              )}
+
             </View>
           </>
         ) : (

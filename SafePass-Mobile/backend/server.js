@@ -1,3 +1,4 @@
+const { attendanceDateError, applyAttendanceFilters } = require("./utils/attendanceFilters");
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -9352,38 +9353,7 @@ app.get("/api/stats", authMiddleware, async (req, res) => {
   }
 });
 
-// 12. DEMO USER CREATION (For testing)
-app.post("/api/create-demo-user", async (req, res) => {
-  try {
-    const demoUser = new User({
-      firstName: "Demo",
-      lastName: "User",
-      email: "demo@student.sapphire.edu",
-      password: "password123",
-      phone: "12345678901",
-      role: "student",
-      studentId: "20240001",
-      course: "Bachelor of Science in Aviation",
-      yearLevel: "1st Year",
-      emergencyContact: "John Doe - 09876543210",
-      nfcCardId: "SAFEPASS-DEMO-001",
-    });
-
-    await demoUser.save();
-
-    res.json({
-      success: true,
-      message: "Demo user created",
-      user: {
-        email: demoUser.email,
-        password: "password123",
-      },
-    });
-  } catch (error) {
-    console.error("âŒ Demo user creation error:", error);
-    res.status(500).json({ error: "Failed to create demo user" });
-  }
-});
+// Demo accounts are created only through the guarded local seed scripts.
 
 // ============ EXISTING VISITOR ROUTES ============
 
@@ -9500,6 +9470,8 @@ app.get(
   requireRoles("admin", "security", "guard", "staff"),
   async (req, res) => {
     try {
+      const dateError = attendanceDateError(req.query);
+      if (dateError) return res.status(400).json({ success: false, message: dateError });
       const page = parseInt(req.query.page, 10) || 1;
       const limit = parseInt(req.query.limit, 10) || 50;
       const safeLimit = Math.min(Math.max(limit, 1), 500);
@@ -9508,26 +9480,7 @@ app.get(
 
       applyDateRangeFilter(query, "attendanceDate", req.query);
 
-      if (req.query.userType) query.userType = String(req.query.userType).trim().toLowerCase();
-      if (req.query.status) query.status = String(req.query.status).trim().toLowerCase();
-      if (req.query.module) query.module = String(req.query.module).trim().toLowerCase();
-      if (req.query.location) {
-        query.location = { $regex: String(req.query.location).trim(), $options: "i" };
-      }
-      if (req.query.search) {
-        const searchPattern = { $regex: String(req.query.search).trim(), $options: "i" };
-        query.$or = [
-          { name: searchPattern },
-          { userType: searchPattern },
-          { role: searchPattern },
-          { status: searchPattern },
-          { location: searchPattern },
-          { checkpointIn: searchPattern },
-          { checkpointOut: searchPattern },
-          { nfcCardId: searchPattern },
-          { sourceDeviceId: searchPattern },
-        ];
-      }
+      applyAttendanceFilters(query, req.query);
 
       const [records, total] = await Promise.all([
         AttendanceRecord.find(query)
@@ -9564,9 +9517,11 @@ app.get(
   requireRoles("admin", "security", "guard", "staff"),
   async (req, res) => {
     try {
+      const dateError = attendanceDateError(req.query);
+      if (dateError) return res.status(400).json({ success: false, message: dateError });
       const query = {};
       applyDateRangeFilter(query, "attendanceDate", req.query);
-      if (req.query.userType) query.userType = String(req.query.userType).trim().toLowerCase();
+      applyAttendanceFilters(query, req.query);
 
       const [summaryCounts = {}] = await AttendanceRecord.aggregate([
         { $match: query },

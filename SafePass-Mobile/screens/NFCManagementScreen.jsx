@@ -1,3 +1,4 @@
+import { fetchPaginatedRecords } from "../utils/paginatedRecords";
 import Alert from '../utils/Alert';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -109,13 +110,13 @@ export default function NFCManagementScreen({ navigation }) {
 
   const loadData = useCallback(async () => {
     const [cardsResponse, usersResponse, activityResponse] = await Promise.all([
-      ApiService.getAllNfcCards({ limit: 100 }),
-      ApiService.getAllUsers({ limit: 150 }),
+      fetchPaginatedRecords(page => ApiService.getAllNfcCards({ page, limit: 500 }), "cards"),
+      fetchPaginatedRecords(page => ApiService.getAllUsers({ page, limit: 500 }), "users"),
       ApiService.getRecentActivities(30),
     ]);
 
-    const nextCards = Array.isArray(cardsResponse?.cards) ? cardsResponse.cards : [];
-    const nextUsers = Array.isArray(usersResponse?.users) ? usersResponse.users : [];
+    const nextCards = cardsResponse;
+    const nextUsers = usersResponse;
     const nextActivity = Array.isArray(activityResponse?.activities)
       ? activityResponse.activities
       : [];

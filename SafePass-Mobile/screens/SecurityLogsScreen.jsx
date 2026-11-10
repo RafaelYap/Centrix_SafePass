@@ -1,3 +1,6 @@
+import Alert from "../utils/Alert";
+import { exportRecordsToCSV } from "../utils/printUtils";
+import { fetchPaginatedRecords } from "../utils/paginatedRecords";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -67,14 +70,8 @@ export default function SecurityLogsScreen({ navigation }) {
   const loadLogs = useCallback(async () => {
     setLoadError("");
     try {
-      const response = await ApiService.getSecurityLogs({ limit: 60 });
-      const nextLogs =
-        response?.logs ||
-        response?.securityLogs ||
-        response?.data ||
-        response?.items ||
-        [];
-      setLogs(Array.isArray(nextLogs) ? nextLogs : []);
+      const records = await fetchPaginatedRecords(page => ApiService.getAccessLogs(page, 500, { all: true }), "accessLogs");
+      setLogs(records);
     } catch (error) {
       setLoadError(error?.message || "Unable to load security logs.");
       setLogs([]);
@@ -117,26 +114,17 @@ export default function SecurityLogsScreen({ navigation }) {
     loadLogs();
   }, [loadLogs]);
 
-  const exportSecurityLogsCsv = () => {
+  const exportSecurityLogsCsv = async () => {
     if (!filteredLogs.length) return;
-    const headers = ["Title", "Description", "Type", "Time"];
-    const rows = filteredLogs.map((l) => [
-      `"${getLogTitle(l)}"`,
-      `"${getLogDescription(l)}"`,
-      `"${getLogMeta(l).label}"`,
-      `"${formatLogTime(l.createdAt || l.timestamp || l.time || l.updatedAt)}"`,
-    ]);
-    const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
-
-    if (typeof window !== "undefined" && window.document) {
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", `SafePass_SecurityLogs_${new Date().toISOString().slice(0, 10)}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    try {
+      await exportRecordsToCSV({
+        headers: ["Title", "Description", "Type", "Time"],
+        rows: filteredLogs.map(log => [getLogTitle(log), getLogDescription(log), getLogMeta(log).label,
+          formatLogTime(log.createdAt || log.timestamp || log.time || log.updatedAt)]),
+        filename: "SafePass_logs.csv",
+      });
+    } catch (error) {
+      Alert.alert("Export failed", error?.message || "Unable to export logs.");
     }
   };
 

@@ -840,3 +840,43 @@ test("admin can reject a visitor registration with reason and log activity", asy
   assert.match(rejectResponse.body.message, /Visitor rejected successfully/i);
 });
 
+
+test("attendance feed and summary reject invalid and reversed dates before querying", async () => {
+  persistDoc({ _id: "admin-dates", email: "dates@example.com", role: "admin", status: "active", isVerified: true });
+  const token = jwt.sign({ userId: "admin-dates" }, process.env.JWT_SECRET, { expiresIn: "1h" });
+  for (const route of ["/api/attendance", "/api/attendance/summary"]) {
+    for (const query of ["dateFrom=abc", "dateFrom=2026-02-30", "dateFrom=2026-11-10&dateTo=2026-11-01"]) {
+      const response = await requestJson(`${route}?${query}`, { headers: { Authorization: `Bearer ${token}` } });
+      assert.equal(response.status, 400);
+      assert.equal(response.body.success, false);
+    }
+  }
+});
+
+test("attendance summary matches the feed search and status population", async () => {
+  persistDoc({ _id: "admin-summary", email: "summary@example.com", role: "admin", status: "active", isVerified: true });
+  const token = jwt.sign({ userId: "admin-summary" }, process.env.JWT_SECRET, { expiresIn: "1h" });
+  const originals = { find: AttendanceRecordMock.find, countDocuments: AttendanceRecordMock.countDocuments, aggregate: AttendanceRecordMock.aggregate };
+  let feedQuery, summaryQuery;
+  AttendanceRecordMock.find = query => {
+    feedQuery = query;
+    return { sort: () => ({ skip: () => ({ limit: () => ({ lean: async () => [] }) }) }) };
+  };
+  AttendanceRecordMock.countDocuments = async () => 0;
+  AttendanceRecordMock.aggregate = async pipeline => { summaryQuery = pipeline[0].$match; return []; };
+  try {
+    const headers = { Authorization: `Bearer ${token}` };
+    const query = "dateFrom=2026-11-01&dateTo=2026-11-10&status=late&search=Jane%20(A)&userType=student";
+    assert.equal((await requestJson(`/api/attendance?${query}`, { headers })).status, 200);
+    assert.equal((await requestJson(`/api/attendance/summary?${query}`, { headers })).status, 200);
+    assert.deepEqual(summaryQuery, feedQuery);
+    assert.equal(summaryQuery.status, "late");
+    assert.ok(new RegExp(summaryQuery.$or[0].name.$regex).test("Jane (A)"));
+  } finally { Object.assign(AttendanceRecordMock, originals); }
+});
+
+test("retired demo endpoint cannot create public accounts with a fixed password", async () => {
+  const response = await requestJson("/api/create-demo-user", { method: "POST", body: {} });
+  assert.equal(response.status, 404);
+  assert.equal(state.users.length, 0);
+});

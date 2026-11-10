@@ -1,3 +1,4 @@
+import saveCsv from "./saveCsv";
 // utils/printUtils.js
 import * as Print from "expo-print";
 import { shareAsync } from "expo-sharing";
@@ -291,52 +292,15 @@ export const exportRecordsToCSV = async ({
     throw new Error("No records to export.");
   }
 
-  const escapeCSV = (val) => {
-    if (val === null || val === undefined) return '""';
-    const str = String(val);
-    if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
-      return `"${str.replace(/"/g, '""')}"`;
-    }
-    return `"${str}"`;
+  const escapeCSV = (value) => {
+    let text = String(value ?? "");
+    if (/^[\s]*[=+@-]/.test(text)) text = `'${text}`;
+    return `"${text.replace(/"/g, '""')}"`;
   };
-
-  const headerRow = headers.map(escapeCSV).join(",");
-  const dataRows = rows.map((row) =>
-    Array.isArray(row) ? row.map(escapeCSV).join(",") : Object.values(row).map(escapeCSV).join(","),
-  );
-
-  const csvString = [headerRow, ...dataRows].join("\r\n");
-
-  if (Platform.OS === "web" && typeof window !== "undefined") {
-    const blob = new Blob(["\uFEFF" + csvString], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", filename);
-    document.body.appendChild(link);
-    link.click();
-    setTimeout(() => {
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }, 500);
-    return { success: true };
-  }
-
-  try {
-    const htmlWrapper = `<pre>${csvString.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>`;
-    const { uri } = await Print.printToFileAsync({
-      html: `<!DOCTYPE html><html><body><pre style="font-family:monospace;white-space:pre-wrap;">${csvString}</pre></body></html>`,
-    });
-    await shareAsync(uri, {
-      mimeType: "text/csv",
-      dialogTitle: "Export Report CSV",
-      UTI: "public.comma-separated-values-text",
-    });
-    return { success: true };
-  } catch (error) {
-    console.error("CSV export error:", error);
-    throw error;
-  }
+  const csvString = [headers, ...rows.map(row => Array.isArray(row) ? row : Object.values(row))]
+    .map(row => row.map(escapeCSV).join(",")).join("\r\n");
+  await saveCsv(csvString, filename);
+  return { success: true };
 };
 
 export const printOfficialSecretariatReport = async ({

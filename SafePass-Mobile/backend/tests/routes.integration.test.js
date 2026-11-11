@@ -405,6 +405,17 @@ test("request limits reject oversized ordinary JSON but allow image-route parsin
   assert.equal(imageRouteResponse.status, 401);
 });
 
+test("malformed JSON returns a client error without exposing parser details", async () => {
+  const response = await fetch(`${baseUrl}/api/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: '{email:invalid}',
+  });
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "Invalid JSON body" });
+});
+
 test("public health response omits internal configuration and diagnostics", async () => {
   const response = await requestJson("/api/health");
 

@@ -17,7 +17,7 @@ for (const scenario of ['otp', 'pending', 'verified', 'cancelled']) {
         if (p.node.id.name === 'handleBiometricLogin') handler = source.slice(p.node.init.start, p.node.init.end);
       },
     });
-    let persisted = 0, cleared = 0, navigated, reset = 0, error = '', busy;
+    let persisted = 0, cleared = 0, navigated, pendingVerification, reset = 0, error = '', busy;
     const noop = () => {};
     const globals = {
       Platform: { OS: 'android' }, isLoading: false, isBiometricLoading: false,
@@ -30,6 +30,7 @@ for (const scenario of ['otp', 'pending', 'verified', 'cancelled']) {
         clearAuth: async () => { cleared++; },
       },
       normalizeRole: role => role, isRoleAllowedInCurrentVariant: () => true,
+      setPendingVerification: details => { pendingVerification = details; },
       persistAuthenticatedSession: async () => { persisted++; },
       navigation: { navigate: (name, params) => { navigated = { name, params }; }, reset: () => { reset++; } },
       IS_VISITOR_ONLY_APP: true,
@@ -41,8 +42,9 @@ for (const scenario of ['otp', 'pending', 'verified', 'cancelled']) {
     assert.equal(cleared, scenario === 'pending' ? 1 : 0);
     if (scenario === 'otp') {
       assert.equal(navigated.name, 'Verification');
-      assert.equal(navigated.params.tempToken, 'token');
-      assert.equal(navigated.params.rememberMe, false);
+      assert.equal(navigated.params, undefined);
+      assert.equal(pendingVerification.tempToken, 'token');
+      assert.equal(pendingVerification.rememberMe, false);
     }
     if (scenario === 'pending' || scenario === 'cancelled') assert.ok(error);
   });

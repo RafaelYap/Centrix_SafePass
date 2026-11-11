@@ -32,6 +32,7 @@ import ApiService from "../utils/ApiService";
 import useServerConnection from "../utils/useServerConnection";
 import useGoogleSignIn from "../utils/useGoogleSignIn";
 import { getDashboardRoute, normalizeRole } from "../utils/authFlow";
+import { setPendingVerification } from "../utils/pendingVerification";
 import {
   APP_ORGANIZATION_NAME,
   IS_VISITOR_ONLY_APP,
@@ -1109,13 +1110,13 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
       }
 
       if (verifyResponse.requires2FA !== false) {
-        navigation.navigate("Verification", {
+        setPendingVerification({
           email: storedEmail,
-          password: storedPassword,
           rememberMe: false,
           tempToken: verifyResponse.tempToken,
           user: normalizedUser,
         });
+        navigation.navigate("Verification");
         return;
       }
 
@@ -1192,13 +1193,13 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
         }
 
         setLoginSplashMessage("Opening two-step verification...");
-        navigation.navigate("Verification", {
+        setPendingVerification({
           email: normalizedIdentifier,
-          password: password,
           rememberMe: rememberMe,
           tempToken: verifyResponse.tempToken,
           user: normalizedUser
         });
+        navigation.navigate("Verification");
         await saveBiometricCredentialsIfEnabled(normalizedIdentifier, password);
       }
     } catch (error) {
@@ -1229,11 +1230,11 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
       ) {
         setLoginError("Incorrect email or password. Please try again.");
       } else if (
+        error?.code === "SAFEPASS_CONNECTION_ERROR" ||
         errorMessage.includes("Network request failed") ||
-        errorMessage.toLowerCase().includes("cannot connect") ||
-        errorMessage.toLowerCase().includes("server")
+        errorMessage.toLowerCase().includes("cannot connect")
       ) {
-        setLoginError("Server unavailable. Please try again.");
+        setLoginError("Server is down or cannot be reached. Please try again.");
       } else {
         setLoginError(errorMessage || "Unable to sign in. Please try again.");
       }
@@ -1811,7 +1812,7 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
                   ]}>
                     <View style={loginStyles.statusDot} />
                     <Text style={loginStyles.statusText}>
-                      {apiConnected === null ? "CHECKING SERVER" : apiConnected ? "SERVER CONNECTED" : "SERVER CHECK FAILED"}
+                      {apiConnected === null ? "CHECKING SERVER" : apiConnected ? "SERVER CONNECTED" : "SERVER IS DOWN"}
                     </Text>
                   </Animated.View>
                 </View>
@@ -1875,7 +1876,7 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
                         ]}>
                           <View style={loginStyles.statusDot} />
                           <Text style={loginStyles.statusText}>
-                            {apiConnected === null ? "CHECKING SERVER" : apiConnected ? "SERVER CONNECTED" : "SERVER CHECK FAILED"}
+                            {apiConnected === null ? "CHECKING SERVER" : apiConnected ? "SERVER CONNECTED" : "SERVER IS DOWN"}
                           </Text>
                         </Animated.View>
                       </View>
@@ -2340,7 +2341,7 @@ export default function LoginScreen({ navigation, route, onLoginSuccess }) {
                   <View style={loginStyles.infoBox}>
                     <Ionicons name="information-circle" size={20} color={brandColors.danger} />
                     <Text style={loginStyles.infoText}>
-                      Server health check did not respond yet. You can still try signing in.
+                      Server is down or cannot be reached. You can try signing in again when it is back.
                     </Text>
                   </View>
                 )}

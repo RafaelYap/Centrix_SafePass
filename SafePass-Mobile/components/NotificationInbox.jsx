@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AppState, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import ApiService from '../utils/ApiService';
 import { emitNotificationUpdate, subscribeNotificationLogout } from '../utils/notificationEvents';
 import { startPushNotifications, clearDeliveredNotifications } from '../utils/pushNotifications';
@@ -12,6 +13,7 @@ export default function NotificationInbox({ currentUser }) {
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
+  const [markingNoticeId, setMarkingNoticeId] = useState(null);
   useEffect(() => {
     let disposed = false, busy = false, userId = '', stopPush = () => {};
     let seen = new Set();
@@ -77,7 +79,10 @@ export default function NotificationInbox({ currentUser }) {
   }, [open, account?._id]);
   if (!account) return null;
   const read = async (notice) => {
+    if (markingNoticeId !== null) return;
     if (String((await ApiService.getCurrentUser())?._id) !== String(account._id)) return;
+    setMarkingNoticeId(notice._id);
+    setHistoryError('');
     try {
       await ApiService.markNotificationAsRead(notice._id);
       setNotices((rows) => rows.filter((row) => row._id !== notice._id));
@@ -85,7 +90,11 @@ export default function NotificationInbox({ currentUser }) {
         ? { ...row, readBy: [...(row.readBy || []), { user: account._id }] }
         : row));
       emitNotificationUpdate();
-    } catch { /* Keep the unread item available for retry. */ }
+    } catch {
+      setHistoryError('Could not mark the notification as read. Please try again.');
+    } finally {
+      setMarkingNoticeId(null);
+    }
   };
   return <>
     {banner && <TouchableOpacity accessibilityRole="button" onPress={() => { setBanner(null); setOpen(true); }}
@@ -93,9 +102,12 @@ export default function NotificationInbox({ currentUser }) {
       <Text style={{ color: 'white', fontWeight: '700' }}>{banner.title}</Text>
       <Text numberOfLines={3} style={{ color: 'white', marginTop: 4 }}>{banner.message}</Text>
     </TouchableOpacity>}
-    <TouchableOpacity accessibilityLabel="Open notifications" onPress={() => setOpen(true)}
-      style={{ position: 'absolute', right: 16, bottom: 88, borderRadius: 24, backgroundColor: '#0A3D91', padding: 12, elevation: 6 }}>
-      <Text style={{ color: 'white', fontWeight: '700' }}>Notifications{notices.length ? ` (${notices.length})` : ''}</Text>
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Open notifications${notices.length ? `, ${notices.length} unread` : ''}`} onPress={() => setOpen(true)}
+      style={{ position: 'absolute', right: 16, bottom: 88, width: 52, height: 52, borderRadius: 26, backgroundColor: '#0A3D91', alignItems: 'center', justifyContent: 'center', elevation: 6 }}>
+      <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
+      {notices.length ? <View style={{ position: 'absolute', top: -4, right: -4, minWidth: 21, height: 21, borderRadius: 11, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: '#DC2626' }}>
+        <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '800' }}>{notices.length > 99 ? '99+' : notices.length}</Text>
+      </View> : null}
     </TouchableOpacity>
     <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
       <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.55)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
@@ -118,8 +130,8 @@ export default function NotificationInbox({ currentUser }) {
               return <View key={notice._id} style={{ backgroundColor: 'white', borderWidth: 1, borderColor: unread ? '#B8CFF5' : '#E2E8F0', padding: 16, borderRadius: 12, marginBottom: 10 }}>
                 <Text style={{ fontWeight: '700', color: '#0F172A' }}>{notice.title}</Text>
                 <Text style={{ marginTop: 6, color: '#334155', lineHeight: 20 }}>{notice.message}</Text>
-                {unread ? <TouchableOpacity accessibilityRole="button" onPress={() => read(notice)} style={{ paddingTop: 12, paddingBottom: 4 }}>
-                  <Text style={{ color: '#0A3D91', fontWeight: '700' }}>Mark as read</Text>
+                {unread ? <TouchableOpacity accessibilityRole="button" accessibilityState={{ busy: markingNoticeId === notice._id }} disabled={markingNoticeId !== null} onPress={() => read(notice)} style={{ paddingTop: 12, paddingBottom: 4, opacity: markingNoticeId !== null ? 0.6 : 1 }}>
+                  <Text style={{ color: '#0A3D91', fontWeight: '700' }}>{markingNoticeId === notice._id ? 'Saving...' : 'Mark as read'}</Text>
                 </TouchableOpacity> : <Text style={{ color: '#64748B', marginTop: 10, fontSize: 12 }}>Read</Text>}
               </View>;
             })}

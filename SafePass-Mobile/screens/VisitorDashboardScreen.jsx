@@ -1792,8 +1792,8 @@ export default function VisitorDashboardScreen({ navigation, onLogout }) {
         setVisitor(null);
       } else if (isSafePassConnectionError(error)) {
         setConnectionIssue({
-          title: "SafePass server unavailable",
-          message: error?.message || "Check your internet connection or try again.",
+          title: "Server is down",
+          message: error?.message || "Please try again when the server is back.",
           updatedAt: Date.now(),
         });
       } else {

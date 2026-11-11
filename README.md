@@ -117,6 +117,52 @@ npm run web:visitor
 
 When testing on a physical phone, replace `localhost` with the development computer's LAN IP address and ensure both devices are on the same network.
 
+## Testing locally without Atlas
+
+Install MongoDB Community Server once, then start these in separate terminals. The
+backend uses `safepass_local_test` on `127.0.0.1`; it does not change the Atlas
+URI in `backend/.env` or touch Atlas data.
+
+```powershell
+cd SafePass-Mobile/backend
+npm run local:backend
+```
+
+On first use, add local test accounts in another terminal:
+
+```powershell
+cd SafePass-Mobile/backend
+npm run local:seed
+```
+
+Start the web client:
+
+```powershell
+cd SafePass-Mobile
+npm run local:web
+```
+
+Open `http://localhost:19006`. The backend health check at
+`http://localhost:5000/api/health` should return `OK`. Test accounts are
+defined in `backend/scripts/seedTestFixtures.js`. Phone verification codes in
+this local mode appear in the backend terminal under `PHONE OTP BACKEND
+FALLBACK`; no SMS credit is used. The local web launcher runs Expo in CI mode
+for reliable startup on this Windows setup, so restart it after changing code.
+Local mode simulates email and keeps API requests on your computer.
+
+For an Android emulator, start the local backend, then run:
+
+```powershell
+cd SafePass-Mobile
+npm run local:android:install
+```
+
+This debug build writes Gradle output under `%LOCALAPPDATA%\SafePassGradle`
+to avoid OneDrive file locks, installs the APK, and maps emulator port 5000 to
+the local API. The first build takes longer. `npm run local:android` builds
+without installing. The existing release APK still uses its configured
+deployed API.
+
 ## Application variants
 
 SafePass supports two build variants:

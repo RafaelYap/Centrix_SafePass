@@ -2574,7 +2574,11 @@ try {
   const mailPort = Number(process.env.MAIL_PORT || 587);
   const mailSecure = String(process.env.MAIL_SECURE || "false").trim() === "true";
 
-  if (process.env.NODE_ENV !== "test" && mailHost && mailUser && mailPass) {
+  if (
+    process.env.NODE_ENV !== "test" &&
+    process.env.MAIL_SIMULATION_MODE !== "true" &&
+    mailHost && mailUser && mailPass
+  ) {
     mailTransporter = nodemailer.createTransport({
       host: mailHost,
       port: mailPort,
@@ -14812,6 +14816,9 @@ app.use((err, req, res, next) => {
       error: "Request body is too large",
       message: "Reduce the upload size and try again.",
     });
+  }
+  if (err?.type === "entity.parse.failed") {
+    return res.status(400).json({ error: "Invalid JSON body" });
   }
   console.error('Server error:', err);
   res.status(500).json({ error: 'Internal server error', message: err.message });

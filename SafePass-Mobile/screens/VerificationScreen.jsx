@@ -20,6 +20,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from 'expo-linear-gradient';
 import ApiService from "../utils/ApiService";
 import { getDashboardRoute, normalizeRole } from "../utils/authFlow";
+import { clearPendingVerification, getPendingVerification } from "../utils/pendingVerification";
 import {
   IS_VISITOR_ONLY_APP,
   getVariantBlockedRoleMessage,
@@ -52,9 +53,11 @@ const storeData = async (key, value) => {
   }
 };
 
-export default function VerificationScreen({ navigation, route }) {
-  // Properly extract params with defaults
-  const { email, password, rememberMe, tempToken, user: userData } = route.params || {};
+export default function VerificationScreen({ navigation }) {
+  const { email, rememberMe, tempToken, user: userData } = getPendingVerification() || {};
+  useEffect(() => {
+    if (!tempToken) navigation.replace("Login");
+  }, [navigation, tempToken]);
   const { width: viewportWidth } = useWindowDimensions();
   const isDesktopLayout = viewportWidth >= 1100;
   const isTabletLayout = viewportWidth >= 768;
@@ -245,7 +248,7 @@ export default function VerificationScreen({ navigation, route }) {
             ? `A test OTP for ${cleanPhone} is available in the backend logs.`
             : `A 6-digit OTP was sent to ${cleanPhone}.`,
           detail: usesBackendOtp
-            ? "Open the latest Render backend log entry marked PHONE OTP BACKEND FALLBACK. The code expires in 5 minutes."
+            ? "Open the latest backend terminal log entry marked PHONE OTP BACKEND FALLBACK. The code expires in 5 minutes."
             : "It expires in 5 minutes. If it expires, request a new code.",
         });
       } else {
@@ -318,13 +321,6 @@ export default function VerificationScreen({ navigation, route }) {
       
       // Reuse the token returned during credential verification to avoid a second login request.
       let sessionToken = verificationResponse?.token || tempToken || null;
-      if (!sessionToken && email && password) {
-        const loginResponse = await ApiService.login(email, password);
-        sessionToken = loginResponse?.token || null;
-        if (loginResponse?.user) {
-          finalUser = loginResponse.user;
-        }
-      }
       if (sessionToken) {
         await ApiService.setToken(sessionToken);
       } else if (tempToken) {
@@ -352,6 +348,7 @@ export default function VerificationScreen({ navigation, route }) {
       // Store user data
       await storeData("currentUser", JSON.stringify({ ...finalUser, role: userRole }));
       await ApiService.rememberCurrentSession();
+      clearPendingVerification();
       
       // Treat remember-me as a trusted device so future logins can follow the faster path.
       if (email) {
@@ -384,6 +381,7 @@ export default function VerificationScreen({ navigation, route }) {
   };
 
   const handleBack = () => {
+    clearPendingVerification();
     navigation.goBack();
   };
 

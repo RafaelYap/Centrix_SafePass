@@ -109,6 +109,7 @@ const isAbortError = (error) =>
 const isNetworkLikeError = (error) => {
   const message = String(error?.message || "");
   return (
+    error?.code === "SAFEPASS_CONNECTION_ERROR" ||
     isAbortError(error) ||
     message.includes("Network request failed") ||
     message.includes("Failed to fetch") ||
@@ -173,7 +174,7 @@ const logApiOperationError = (operation, error) => {
 };
 const createSafePassConnectionError = () => {
   const error = new Error(
-    "Cannot connect to the SafePass server. Please check your internet connection and try again."
+    "Server is down or cannot be reached. Please try again."
   );
   error.isSafePassConnectionError = true;
   error.code = "SAFEPASS_CONNECTION_ERROR";

@@ -6523,6 +6523,7 @@ export default StyleSheet.create({
 
   visitorFlowPanelTitleWrap: {
     flex: 1,
+    minWidth: 0,
   },
 
   visitorFlowPanelEyebrow: {

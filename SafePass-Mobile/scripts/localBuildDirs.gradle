@@ -1,0 +1,10 @@
+def outputRoot = System.getenv('SAFEPASS_GRADLE_BUILD_ROOT')
+
+if (outputRoot) {
+    gradle.beforeProject { project ->
+        if (project == project.rootProject) return
+        def safeName = project.name.replaceAll('[^A-Za-z0-9_-]', '_')
+        def key = Integer.toHexString(project.projectDir.canonicalPath.toLowerCase().hashCode())
+        project.layout.buildDirectory.set(new File(outputRoot, "${safeName}-${key}"))
+    }
+}

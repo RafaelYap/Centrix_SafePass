@@ -20,13 +20,40 @@ module.exports = ({ config }) => {
       "",
   ).startsWith("http://");
 
+  // iOS Google Sign-In needs its own OAuth client ID (type "iOS" in Google Cloud).
+  // The URL scheme is that client ID reversed. Without it, Google sign-in stays
+  // hidden on iOS and the rest of the app builds normally.
+  const googleIosClientId = String(
+    process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ||
+      expoConfig.extra?.googleIosClientId ||
+      "",
+  ).trim();
+  const googleIosUrlScheme = googleIosClientId.endsWith(".apps.googleusercontent.com")
+    ? `com.googleusercontent.apps.${googleIosClientId.replace(".apps.googleusercontent.com", "")}`
+    : "";
+  const iosBundleIdentifier =
+    expoConfig.ios?.bundleIdentifier || "com.sapphire.centrixsafepass";
+
   return {
     ...config,
     ...expoConfig,
     name: appName,
     slug: isVisitorBuild ? "safepass-visitor" : expoConfig.slug,
+    plugins: [
+      ...(expoConfig.plugins || []),
+      ...(googleIosUrlScheme
+        ? [["@react-native-google-signin/google-signin", { iosUrlScheme: googleIosUrlScheme }]]
+        : []),
+    ],
+    ios: {
+      ...(expoConfig.ios || {}),
+      bundleIdentifier: isVisitorBuild
+        ? `${iosBundleIdentifier}.visitor`
+        : iosBundleIdentifier,
+    },
     extra: {
       ...(expoConfig.extra || {}),
+      ...(googleIosClientId ? { googleIosClientId } : {}),
       pushNotificationsConfigured,
       apiBaseUrl: String(process.env.EXPO_PUBLIC_API_BASE_URL || "").trim(),
       appVariant: variant,

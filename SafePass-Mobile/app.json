@@ -15,6 +15,8 @@
       "**/*"
     ],
     "ios": {
+      "bundleIdentifier": "com.sapphire.centrixsafepass",
+      "buildNumber": "104",
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera to take photos of your ID for verification",
@@ -62,13 +64,29 @@
         "expo-image-picker",
         {
           "photosPermission": "The app needs access to your photos to upload your ID.",
-          "cameraPermission": "The app needs access to your camera to take photos of your ID."
+          "cameraPermission": "The app needs access to your camera to take photos of your ID.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "This app uses the camera to take photos of your ID for verification",
+          "microphonePermission": false
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "SafePass uses your location while you are checked in so security can monitor active visitor presence."
+          "locationWhenInUsePermission": "SafePass uses your location while you are checked in so security can monitor active visitor presence.",
+          "locationAlwaysPermission": false,
+          "locationAlwaysAndWhenInUsePermission": false
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "SafePass uses Face ID so you can sign in quickly and securely."
         }
       ]
     ],

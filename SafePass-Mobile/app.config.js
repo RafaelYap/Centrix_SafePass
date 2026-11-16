@@ -6,6 +6,10 @@ const normalizeVariant = (value) =>
   String(value || "").toLowerCase().trim() === "visitor" ? "visitor" : "full";
 
 module.exports = ({ config }) => {
+  const releaseApiUrl = String(process.env.EXPO_PUBLIC_API_BASE_URL || "").trim();
+  if (releaseApiUrl.includes("your-render-backend") || releaseApiUrl.includes("example.com")) {
+    throw new Error("Replace the placeholder EXPO_PUBLIC_API_BASE_URL with the real SafePass API before building.");
+  }
   const variant = normalizeVariant(process.env.EXPO_PUBLIC_APP_VARIANT);
   const expoConfig = baseConfig.expo || {};
   const isVisitorBuild = variant === "visitor";

@@ -476,7 +476,7 @@ test("login rate limiting blocks repeated failed attempts", async () => {
   }
 });
 
-test("password reset request is generic for existing and missing accounts", async () => {
+test("password reset rejects unavailable email delivery instead of simulating success", async () => {
   persistDoc({
     _id: "user-2",
     email: "visitor@example.com",
@@ -498,9 +498,8 @@ test("password reset request is generic for existing and missing accounts", asyn
     body: { email: "missing@example.com" },
   });
 
-  assert.equal(existingResponse.status, 200);
+  assert.equal(existingResponse.status, 500);
   assert.equal(missingResponse.status, 200);
-  assert.equal(existingResponse.body.message, missingResponse.body.message);
 });
 
 test("passkey enrollment and 2FA routes are registered and require authentication", async () => {

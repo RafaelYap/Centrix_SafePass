@@ -60,8 +60,7 @@ app.use((req, res, next) => {
 const isVercelRuntime = Boolean(process.env.VERCEL);
 const isProductionRuntime = String(process.env.NODE_ENV || "").trim().toLowerCase() === "production";
 const sensitiveDebugLoggingEnabled =
-  !isProductionRuntime &&
-  String(process.env.ALLOW_SENSITIVE_DEBUG_LOGS || "").trim().toLowerCase() === "true";
+  false;
 const phoneOtpSmsProviderConfigured = [
   "SEMAPHORE_API_KEY",
   "SEMAPHORE_API_TOKEN",
@@ -272,9 +271,7 @@ const getConfiguredSmsProvider = () =>
     .toLowerCase();
 
 const isPhoneOtpBackendLogModeEnabled = () =>
-  String(process.env.PHONE_OTP_BACKEND_LOG_MODE || "true")
-    .trim()
-    .toLowerCase() !== "false";
+  false;
 
 const getPhoneOtpDeliveryProvider = () => {
   if (isPhoneOtpBackendLogModeEnabled()) return "backend_log";
@@ -293,15 +290,7 @@ const getPhoneOtpDeliveryProvider = () => {
 };
 
 const shouldFallbackPhoneOtpToBackendLog = () =>
-  sensitiveDebugLoggingEnabled ||
-  String(
-    process.env.SMS_ALLOW_BACKEND_LOG_FALLBACK ||
-      process.env.SEMAPHORE_ALLOW_BACKEND_LOG_FALLBACK ||
-      process.env.IPROGTECH_ALLOW_BACKEND_LOG_FALLBACK ||
-      "",
-  )
-    .trim()
-    .toLowerCase() === "true";
+  false;
 
 const logPhoneOtpBackendFallback = ({ phoneNumber, otpCode, method, reason }) => {
   console.warn(`SMS OTP fallback enabled: ${reason || "SMS delivery unavailable"}`);
@@ -353,9 +342,7 @@ const SMART_TNT_DEFAULT_PREFIXES = [
 ];
 
 const getSmartTntOtpBackendLogEnabled = () =>
-  String(process.env.SMART_TNT_OTP_BACKEND_LOG || "true")
-    .trim()
-    .toLowerCase() !== "false";
+  false;
 
 const getSmartTntOtpPrefixes = () => {
   const configuredPrefixes = String(process.env.SMART_TNT_OTP_PREFIXES || "")
@@ -2576,7 +2563,6 @@ try {
 
   if (
     process.env.NODE_ENV !== "test" &&
-    process.env.MAIL_SIMULATION_MODE !== "true" &&
     mailHost && mailUser && mailPass
   ) {
     mailTransporter = nodemailer.createTransport({
@@ -2696,16 +2682,14 @@ const sendEmail = async (to, subject, body, options = {}) => {
     );
   } else if (!process.env.MAIL_HOST || !process.env.MAIL_USER || !process.env.MAIL_PASS) {
     console.warn(
-      "\nMAIL_HOST / MAIL_USER / MAIL_PASS are not configured. Falling back to email simulation.",
+      "\nMAIL_HOST / MAIL_USER / MAIL_PASS are not configured. Email delivery is unavailable.",
     );
   }
 
-  console.log(`Email simulation generated for ${to}. Subject: ${subject}`);
-  logSensitiveDebug(`Simulated email body for ${to}:`, body);
-  return { success: true, simulated: true, delivered: false };
+  return { success: false, simulated: false, delivered: false, error: "Email delivery is not configured." };
 };
 
-const canUseBackendLogOtpFallback = () => sensitiveDebugLoggingEnabled;
+const canUseBackendLogOtpFallback = () => false;
 
 const isOtpDeliveryUsable = (emailResult) =>
   Boolean(emailResult?.delivered || canUseBackendLogOtpFallback());
@@ -8919,7 +8903,7 @@ app.post("/api/auth/request-otp", async (req, res) => {
     }
 
     // Generate a random 6-digit OTP
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
 
     // Store OTP with expiration (5 minutes)
     otpStore.set(cleanPhone, {
@@ -8932,6 +8916,10 @@ app.post("/api/auth/request-otp", async (req, res) => {
     const tempToken =
       "otp_" + Math.random().toString(36).substring(2) + Date.now();
     let deliveryProvider = getPhoneOtpDeliveryProvider();
+    if (deliveryProvider === "backend_log") {
+      otpStore.delete(cleanPhone);
+      return res.status(503).json({ success: false, message: "SMS delivery is not configured. Please contact support." });
+    }
     let backendLogPrinted = false;
     const shouldUseBackendLogForSmartTnt =
       getSmartTntOtpBackendLogEnabled() && isSmartTntOtpNumber(cleanPhone);

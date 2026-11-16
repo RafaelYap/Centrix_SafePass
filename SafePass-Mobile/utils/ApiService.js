@@ -93,7 +93,7 @@ const API_BASE_URL_CANDIDATES = [API_BASE_URL]
 const UNIQUE_API_BASE_URL_CANDIDATES = [...new Set(API_BASE_URL_CANDIDATES)];
 
 // Keep simulation/fallback OFF by default so app uses real backend/database.
-const DEV_FALLBACK_ENABLED = process.env.EXPO_PUBLIC_ENABLE_DEV_FALLBACK === "true";
+const DEV_FALLBACK_ENABLED = false;
 const API_DEBUG_ENABLED = process.env.EXPO_PUBLIC_API_DEBUG === "true";
 const logApiDebug = (...args) => {
   if (API_DEBUG_ENABLED) {

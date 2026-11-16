@@ -16,12 +16,13 @@
     ],
     "ios": {
       "bundleIdentifier": "com.sapphire.centrixsafepass",
-      "buildNumber": "104",
+      "buildNumber": "106",
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera to take photos of your ID for verification",
         "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to upload your ID",
-        "NSLocationWhenInUseUsageDescription": "SafePass uses your location while you are checked in so security can monitor active visitor presence."
+        "NSLocationWhenInUseUsageDescription": "SafePass uses your location while you are checked in so security can monitor active visitor presence.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -59,7 +60,13 @@
       "expo-font",
       "expo-secure-store",
       "expo-sharing",
-      "react-native-nfc-manager",
+      [
+        "react-native-nfc-manager",
+        {
+          "includeNdefEntitlement": false,
+          "nfcPermission": "SafePass reads campus NFC cards to verify access and attendance."
+        }
+      ],
       [
         "expo-image-picker",
         {

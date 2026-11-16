@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 16.0.0"
+    "version": ">= 16.0.0",
+    "appVersionSource": "local"
   },
   "build": {
     "full-apk": {
@@ -89,6 +90,22 @@
       },
       "env": {
         "EXPO_PUBLIC_APP_VARIANT": "visitor"
+      }
+    },
+    "full-android-store": {
+      "extends": "full-apk",
+      "distribution": "store",
+      "android": {
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleFullRelease"
+      }
+    }
+  },
+  "submit": {
+    "full-ios": {
+      "ios": {
+        "ascAppId": "6835368063",
+        "appleTeamId": "94NL23B23D"
       }
     }
   }

@@ -832,10 +832,12 @@ const upsertAttendanceRecordForTap = async ({
   timestamp = new Date(),
   nfcCardId = "",
   deviceId = "",
+  priorCheckIn = null,
 }) => {
   const normalizedRole = normalizeUserRoleValue(user?.role || visitor?.role || "visitor");
-  const dayStart = getStartOfDay(timestamp);
-  const dayEnd = getEndOfDay(timestamp);
+  const sessionDate = priorCheckIn || timestamp;
+  const dayStart = getStartOfDay(sessionDate);
+  const dayEnd = getEndOfDay(sessionDate);
   const query = {
     attendanceDate: { $gte: dayStart, $lt: dayEnd },
     module: getAttendanceModuleForRole(normalizedRole, user),
@@ -858,9 +860,14 @@ const upsertAttendanceRecordForTap = async ({
         nfcCardId,
         tapLocation,
         deviceId,
-        timestamp,
+        timestamp: sessionDate,
       }),
     );
+  }
+
+  if (priorCheckIn && !attendanceRecord.checkInTime) {
+    attendanceRecord.checkInTime = priorCheckIn;
+    appendAttendanceCheckpoint(attendanceRecord, {}, "check_in", priorCheckIn);
   }
 
   attendanceRecord.lastTapTime = timestamp;
@@ -12620,6 +12627,13 @@ app.put("/api/visitors/:id/checkin", authMiddleware, requireRoles("admin", "secu
       deviceId: "security-dashboard",
       action: "check_in",
     });
+    const attendance = await upsertAttendanceRecordForTap({
+      visitor,
+      action: "check_in",
+      timestamp: visitor.checkedInAt,
+      tapLocation: { office: visitor.assignedOffice || visitor.host || "Campus Entry" },
+      deviceId: "security-dashboard",
+    });
     await visitor.save();
 
     const accessLog = new AccessLog({
@@ -12635,6 +12649,7 @@ app.put("/api/visitors/:id/checkin", authMiddleware, requireRoles("admin", "secu
       relatedUser: req.user._id,
       metadata: {
         action: "check_in",
+        attendanceRecordId: attendance._id,
         currentLocation: visitor.currentLocation,
       },
       notes: `Checked in by ${req.user.firstName} ${req.user.lastName}`,
@@ -12692,6 +12707,14 @@ app.put("/api/visitors/:id/checkout", authMiddleware, requireRoles("admin", "sec
     }
 
     visitor.markCheckedOut(req.user._id);
+    const attendance = await upsertAttendanceRecordForTap({
+      visitor,
+      action: "check_out",
+      timestamp: visitor.checkedOutAt,
+      tapLocation: { office: visitor.assignedOffice || visitor.host || "Campus Exit" },
+      deviceId: "security-dashboard",
+      priorCheckIn: visitor.checkedInAt,
+    });
     await visitor.save();
 
     const accessLog = new AccessLog({
@@ -12707,6 +12730,7 @@ app.put("/api/visitors/:id/checkout", authMiddleware, requireRoles("admin", "sec
       relatedUser: req.user._id,
       metadata: {
         action: "check_out",
+        attendanceRecordId: attendance._id,
         currentLocation: visitor.currentLocation,
       },
       notes: `Checked out by ${req.user.firstName} ${req.user.lastName}`,

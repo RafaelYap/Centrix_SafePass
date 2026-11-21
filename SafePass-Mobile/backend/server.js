@@ -271,7 +271,11 @@ const getConfiguredSmsProvider = () =>
     .toLowerCase();
 
 const isPhoneOtpBackendLogModeEnabled = () =>
-  false;
+  ["test", "development"].includes(process.env.NODE_ENV) &&
+  process.env.PHONE_OTP_BACKEND_LOG_MODE === "true" &&
+  /^mongodb:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?\/safepass_local_test(?:\?|$)/.test(
+    process.env.MONGODB_URI || "",
+  );
 
 const getPhoneOtpDeliveryProvider = () => {
   if (isPhoneOtpBackendLogModeEnabled()) return "backend_log";
@@ -8916,7 +8920,7 @@ app.post("/api/auth/request-otp", async (req, res) => {
     const tempToken =
       "otp_" + Math.random().toString(36).substring(2) + Date.now();
     let deliveryProvider = getPhoneOtpDeliveryProvider();
-    if (deliveryProvider === "backend_log") {
+    if (deliveryProvider === "backend_log" && !isPhoneOtpBackendLogModeEnabled()) {
       otpStore.delete(cleanPhone);
       return res.status(503).json({ success: false, message: "SMS delivery is not configured. Please contact support." });
     }

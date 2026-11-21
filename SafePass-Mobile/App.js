@@ -84,7 +84,7 @@ const WEB_ROUTE_TITLES = {
   AdminDashboard: `Admin Dashboard | ${APP_ORGANIZATION}`,
   StaffDashboard: `Staff Dashboard | ${APP_ORGANIZATION}`,
   SecurityDashboard: `Security Operations | ${APP_ORGANIZATION}`,
-  StudentDashboard: `Student Dashboard | ${APP_ORGANIZATION}`,
+  StudentDashboard: `Academic Dashboard | ${APP_ORGANIZATION}`,
   VisitorDashboard: `Visitor Dashboard | ${APP_ORGANIZATION}`,
   VisitorPass: `Visitor Pass | ${APP_ORGANIZATION}`,
   WebMapScreen: `Campus Map | ${APP_ORGANIZATION}`,

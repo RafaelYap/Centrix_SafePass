@@ -256,7 +256,7 @@ export default function VerificationScreen({ navigation }) {
       }
     } catch (error) {
       console.error("OTP request error:", error);
-      Alert.alert("Error", "Unable to send verification code. Please check your connection.");
+      Alert.alert("Error", error?.message || "Unable to send verification code. Please try again.");
     } finally {
       setIsLoading(false);
     }
